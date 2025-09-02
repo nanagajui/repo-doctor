@@ -134,6 +134,30 @@ dmypy.json
 temp/
 tmp/
 test_repos/
+test_output/
+
+# MCP filesystem (experimental - exclude for now)
+../mcp-filesystem/
+
+# Node.js (if any JS tooling is added)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+
+# Generated files
+Dockerfile
+docker-compose.yml
+environment.yml
+requirements.txt
+setup.sh
+setup_conda.sh
+setup_venv.sh
+SETUP_INSTRUCTIONS.md
 
 # IDE
 .vscode/
