@@ -8,15 +8,21 @@ from github import Github
 from ..models.analysis import Analysis, RepositoryInfo, DependencyInfo, CompatibilityIssue, DependencyType
 from ..utils.github import GitHubHelper
 from ..utils.parsers import RepositoryParser
+from ..utils.llm import LLMFactory, LLMAnalyzer
+from ..utils.config import Config
 
 
 class AnalysisAgent:
     """Agent for analyzing repositories."""
     
-    def __init__(self, github_token: Optional[str] = None):
+    def __init__(self, github_token: Optional[str] = None, config: Optional[Config] = None):
         self.github = Github(github_token) if github_token else Github()
         self.github_helper = GitHubHelper(github_token)
         self.repo_parser = RepositoryParser(self.github_helper)
+        
+        # Initialize LLM analyzer if configured
+        self.config = config or Config.load()
+        self.llm_analyzer = LLMFactory.create_analyzer(self.config)
     
     async def analyze(self, repo_url: str) -> Analysis:
         """Analyze repository for compatibility issues."""
@@ -124,10 +130,12 @@ class AnalysisAgent:
             # Check README files
             readme_files = ["README.md", "README.rst", "README.txt", "readme.md"]
             readme_content = None
+            raw_readme_content = None
             
             for readme_file in readme_files:
                 content = await self._get_file_content(repo_info.owner, repo_info.name, readme_file)
                 if content:
+                    raw_readme_content = content
                     readme_content = content.lower()
                     break
             
@@ -184,6 +192,26 @@ class AnalysisAgent:
                 for pattern in req_patterns:
                     matches = re.findall(pattern, readme_content)
                     doc_info["system_requirements"].extend(matches)
+                
+                # Enhance with LLM analysis if available
+                if self.llm_analyzer and raw_readme_content:
+                    llm_doc_analysis = await self.llm_analyzer.enhance_documentation_analysis(raw_readme_content)
+                    if llm_doc_analysis:
+                        # Merge LLM insights with regex-based analysis
+                        if llm_doc_analysis.get('python_versions') and not doc_info["python_version"]:
+                            versions = llm_doc_analysis['python_versions']
+                            if versions:
+                                doc_info["python_version"] = versions[0]  # Use first detected version
+                        
+                        if llm_doc_analysis.get('gpu_requirements') and not doc_info["gpu_required"]:
+                            gpu_req = llm_doc_analysis['gpu_requirements'].lower()
+                            doc_info["gpu_required"] = 'required' in gpu_req or 'cuda' in gpu_req
+                        
+                        if llm_doc_analysis.get('system_requirements'):
+                            doc_info["system_requirements"].extend(llm_doc_analysis['system_requirements'])
+                        
+                        # Store LLM analysis for later use
+                        doc_info["llm_analysis"] = llm_doc_analysis
         
         except Exception:
             pass

@@ -145,10 +145,11 @@ repo-doctor check <repo_url> \
     --gpu-mode strict \
     --output ./environments/
 
-# Knowledge base operations
-repo-doctor learn --from-ci <repo_url>
-repo-doctor patterns --show-failures
-repo-doctor cache --clear
+# LLM-enhanced analysis
+repo-doctor check <repo_url> \
+    --enable-llm \
+    --llm-url http://localhost:1234/v1 \
+    --llm-model qwen/qwen3-4b-thinking-2507
 ```
 
 ### Output Format
@@ -261,9 +262,14 @@ advanced:
   container_timeout: 300  # 5 minutes
   
 integrations:
-  openai_api_key: ${OPENAI_API_KEY}
-  perplexity_api_key: ${PERPLEXITY_API_KEY}
-  use_llm_fallback: false
+  github_token: ${GITHUB_TOKEN}  # Optional for private repos
+  llm:
+    enabled: false
+    base_url: http://localhost:1234/v1
+    model: qwen/qwen3-4b-thinking-2507
+    timeout: 30
+    max_tokens: 512
+    temperature: 0.1
 ```
 
 ## Error Handling Philosophy

@@ -1,0 +1,37 @@
+# Repo Doctor Configuration Example
+# Copy to ~/.repo-doctor/config.yaml and customize
+
+defaults:
+  strategy: auto  # docker|conda|venv|auto
+  validation: true
+  gpu_mode: flexible  # strict|flexible|cpu_fallback
+
+knowledge_base:
+  location: ~/.repo-doctor/kb/
+  sync: false
+
+advanced:
+  parallel_analysis: true
+  cache_ttl: 604800  # 7 days
+  container_timeout: 300  # 5 minutes
+
+integrations:
+  # GitHub token for private repos and higher rate limits
+  github_token: ${GITHUB_TOKEN}
+  
+  # LLM Integration Settings
+  llm:
+    enabled: true  # Enable LLM assistance
+    base_url: http://localhost:1234/v1  # LLM server URL
+    api_key: ${LLM_API_KEY}  # Optional API key
+    model: qwen/qwen3-4b-thinking-2507  # Model name
+    timeout: 30  # Request timeout in seconds
+    max_tokens: 512  # Maximum tokens per request
+    temperature: 0.1  # Temperature for generation (0.0-1.0)
+  
+  # Legacy LLM fallback setting (deprecated, use llm.enabled instead)
+  use_llm_fallback: false
+  
+  # Optional external API keys
+  openai_api_key: ${OPENAI_API_KEY}
+  perplexity_api_key: ${PERPLEXITY_API_KEY}

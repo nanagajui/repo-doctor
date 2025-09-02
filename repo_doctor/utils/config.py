@@ -27,12 +27,24 @@ class AdvancedConfig(BaseModel):
     container_timeout: int = 300  # 5 minutes
 
 
+class LLMConfig(BaseModel):
+    """LLM integration configuration."""
+    enabled: bool = False
+    base_url: str = "http://localhost:1234/v1"
+    api_key: Optional[str] = None
+    model: str = "qwen/qwen3-4b-thinking-2507"
+    timeout: int = 30
+    max_tokens: int = 512
+    temperature: float = 0.1
+
+
 class IntegrationsConfig(BaseModel):
     """External integrations configuration."""
     openai_api_key: Optional[str] = None
     perplexity_api_key: Optional[str] = None
     github_token: Optional[str] = None
     use_llm_fallback: bool = False
+    llm: LLMConfig = Field(default_factory=LLMConfig)
 
 
 class Config(BaseModel):

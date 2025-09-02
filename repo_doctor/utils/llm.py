@@ -10,11 +10,13 @@ import os
 class LLMClient:
     """Client for local LLM integration (LM Studio, Ollama, etc.)."""
     
-    def __init__(self, base_url: str = "http://localhost:1234/v1", api_key: Optional[str] = None):
+    def __init__(self, base_url: str = "http://localhost:1234/v1", api_key: Optional[str] = None, 
+                 model: str = "qwen/qwen3-4b-thinking-2507", timeout: int = 30):
         self.base_url = base_url.rstrip('/')
         self.api_key = api_key or os.getenv('LLM_API_KEY')
+        self.model = model
+        self.timeout = timeout
         self.available = False
-        self._check_availability()
     
     async def _check_availability(self) -> bool:
         """Check if LLM service is available."""
@@ -41,7 +43,7 @@ class LLMClient:
                 headers["Authorization"] = f"Bearer {self.api_key}"
             
             payload = {
-                "model": "local-model",  # LM Studio uses this for loaded model
+                "model": self.model,
                 "messages": [{"role": "user", "content": prompt}],
                 "max_tokens": max_tokens,
                 "temperature": temperature,
@@ -53,16 +55,47 @@ class LLMClient:
                     f"{self.base_url}/chat/completions",
                     headers=headers,
                     json=payload,
-                    timeout=30
+                    timeout=self.timeout
                 ) as response:
                     if response.status == 200:
                         result = await response.json()
-                        return result["choices"][0]["message"]["content"]
+                        content = result["choices"][0]["message"]["content"]
+                        return self._extract_response_from_thinking(content)
                     return None
         
         except Exception as e:
             print(f"LLM request failed: {e}")
             return None
+    
+    def _extract_response_from_thinking(self, content: str) -> str:
+        """Extract actual response from thinking tags for qwen/qwen3-4b-thinking-2507."""
+        if not content:
+            return content
+        
+        import re
+        
+        # For qwen thinking models, find JSON objects in the content
+        # Look for complete JSON objects (handling nested braces)
+        json_pattern = r'\{(?:[^{}]|(?:\{[^{}]*\}))*\}'
+        json_matches = list(re.finditer(json_pattern, content, re.DOTALL))
+        
+        if json_matches:
+            # Return the last (most complete) JSON match
+            return json_matches[-1].group().strip()
+        
+        # If no JSON found but has thinking tags, try to find content after </think>
+        if '</think>' in content:
+            think_end_match = re.search(r'</think>\s*(.*)', content, re.DOTALL)
+            if think_end_match:
+                return think_end_match.group(1).strip()
+        
+        # If has unclosed <think> tag, remove everything from <think> onwards
+        if '<think>' in content:
+            cleaned_content = re.sub(r'<think>.*', '', content, flags=re.DOTALL)
+            return cleaned_content.strip()
+        
+        # No thinking tags, return as-is
+        return content.strip()
 
 
 class LLMAnalyzer:
@@ -85,13 +118,10 @@ Python Version: {analysis_data.get('python_version_required', 'Not specified')}
 GPU Required: {analysis_data.get('min_gpu_memory_gb', 0) > 0}
 Issues: {[issue['message'] for issue in analysis_data.get('compatibility_issues', [])]}
 
-Provide a JSON response with:
-1. "strategy": recommended strategy (docker/conda/venv)
-2. "reasoning": why this strategy is best
-3. "special_instructions": any special setup steps needed
-4. "alternatives": other viable options
+IMPORTANT: Respond ONLY with a valid JSON object. Do not include any explanatory text before or after the JSON.
 
-Response format: {{"strategy": "...", "reasoning": "...", "special_instructions": [...], "alternatives": [...]}}
+Required JSON format:
+{{"strategy": "docker|conda|venv", "reasoning": "explanation", "special_instructions": ["step1", "step2"], "alternatives": ["alt1", "alt2"]}}
 """
         
         response = await self.llm.generate_completion(prompt, max_tokens=800)
@@ -115,16 +145,19 @@ Response format: {{"strategy": "...", "reasoning": "...", "special_instructions"
         prompt = f"""
 Analyze this README content for Python environment requirements:
 
-{readme_content[:2000]}  # Truncate for token limits
+{readme_content[:2000]}
 
-Extract and return JSON with:
-1. "python_versions": list of supported Python versions
-2. "system_requirements": list of system-level dependencies
-3. "gpu_requirements": GPU/CUDA requirements if any
-4. "installation_complexity": "simple"/"moderate"/"complex"
-5. "special_notes": any important setup considerations
+IMPORTANT: Respond ONLY with a valid JSON object. Do not include any explanatory text, thinking, or comments before or after the JSON.
 
-Response format: {{"python_versions": [...], "system_requirements": [...], "gpu_requirements": "...", "installation_complexity": "...", "special_notes": [...]}}
+Required JSON format:
+{{"python_versions": ["3.9", "3.10"], "system_requirements": ["cuda", "nvidia-driver"], "gpu_requirements": "CUDA 11.8+ required", "installation_complexity": "moderate", "special_notes": ["note1", "note2"]}}
+
+Extract:
+- python_versions: list of supported Python versions (e.g., ["3.9", "3.10"])
+- system_requirements: list of system-level dependencies
+- gpu_requirements: GPU/CUDA requirements description
+- installation_complexity: "simple", "moderate", or "complex"
+- special_notes: important setup considerations
 """
         
         response = await self.llm.generate_completion(prompt, max_tokens=600)
@@ -151,32 +184,37 @@ Response format: {{"python_versions": [...], "system_requirements": [...], "gpu_
 A Docker container validation failed for this Python repository. Diagnose the issue and suggest a fix:
 
 Repository: {analysis_data.get('repository', {}).get('name', 'Unknown')}
-Dependencies: {[dep['name'] for dep in analysis_data.get('dependencies', [])[:5]}
+Dependencies: {', '.join([dep['name'] for dep in analysis_data.get('dependencies', [])[:5]])}
 Error Logs:
 {logs_text}
 
-Provide a concise diagnosis and specific fix suggestion in 2-3 sentences.
+IMPORTANT: Respond with ONLY a concise diagnosis and specific fix suggestion in 2-3 sentences. Do not include any thinking process or extra commentary.
 """
         
         response = await self.llm.generate_completion(prompt, max_tokens=300)
         return response
 
 
-class LLMConfig:
-    """Configuration management for LLM integration."""
+class LLMFactory:
+    """Factory for creating LLM clients from configuration."""
     
     @staticmethod
-    def get_config() -> Dict[str, Any]:
-        """Get LLM configuration from environment or defaults."""
-        return {
-            "enabled": os.getenv('REPO_DOCTOR_LLM_ENABLED', 'false').lower() == 'true',
-            "base_url": os.getenv('REPO_DOCTOR_LLM_URL', 'http://localhost:1234/v1'),
-            "api_key": os.getenv('REPO_DOCTOR_LLM_API_KEY'),
-            "timeout": int(os.getenv('REPO_DOCTOR_LLM_TIMEOUT', '30')),
-            "max_tokens": int(os.getenv('REPO_DOCTOR_LLM_MAX_TOKENS', '512'))
-        }
+    def create_client(config) -> Optional[LLMClient]:
+        """Create LLM client from configuration."""
+        if not config.integrations.llm.enabled:
+            return None
+        
+        return LLMClient(
+            base_url=config.integrations.llm.base_url,
+            api_key=config.integrations.llm.api_key,
+            model=config.integrations.llm.model,
+            timeout=config.integrations.llm.timeout
+        )
     
     @staticmethod
-    def is_enabled() -> bool:
-        """Check if LLM integration is enabled."""
-        return LLMConfig.get_config()["enabled"]
+    def create_analyzer(config) -> Optional[LLMAnalyzer]:
+        """Create LLM analyzer from configuration."""
+        client = LLMFactory.create_client(config)
+        if client is None:
+            return None
+        return LLMAnalyzer(client)

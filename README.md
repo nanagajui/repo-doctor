@@ -60,19 +60,22 @@ repo-doctor check https://github.com/CompVis/stable-diffusion \
     --validate \
     --gpu-mode strict
 
-# Learn from repository patterns
-repo-doctor learn https://github.com/pytorch/pytorch --from-ci
-
-# View learned patterns
-repo-doctor patterns --show-failures
+# Enable LLM assistance for complex repositories
+repo-doctor check https://github.com/complex/ml-project --enable-llm --validate
 ```
 
 ## Commands
 
 - `check <repo_url>` - Analyze repository and generate environment
-- `learn <repo_url>` - Learn patterns from repository
-- `patterns` - Show learned compatibility patterns
-- `cache` - Manage knowledge base cache
+
+### Available Options for `check`:
+- `--strategy` - Choose environment strategy (docker|conda|venv|auto)
+- `--validate/--no-validate` - Enable/disable solution validation
+- `--gpu-mode` - GPU compatibility mode (strict|flexible|cpu_fallback)
+- `--output` - Output directory for generated files
+- `--enable-llm/--disable-llm` - Enable/disable LLM assistance
+- `--llm-url` - Custom LLM server URL
+- `--llm-model` - Custom LLM model name
 
 ## Configuration
 
@@ -89,17 +92,24 @@ knowledge_base:
   
 integrations:
   github_token: ${GITHUB_TOKEN}  # Optional for private repos
+  llm:
+    enabled: false
+    base_url: http://localhost:1234/v1
+    model: qwen/qwen3-4b-thinking-2507
 ```
 
 ## Development Status
 
-**Phase 1 Complete**: Core architecture, CLI interface, and foundational components
+**✅ PRODUCTION READY**: All phases complete with comprehensive functionality
 
-**Next Steps**:
-- Implement repository analysis logic
-- Add container validation
-- Enhance learning system
-- Add comprehensive testing
+**Completed Features**:
+- ✅ Three-agent architecture (Profile, Analysis, Resolution)
+- ✅ Multi-strategy environment generation (Docker, Conda, Venv)
+- ✅ Knowledge base and learning system
+- ✅ Container validation with GPU support
+- ✅ LLM integration for enhanced analysis
+- ✅ Rich CLI interface with progress indicators
+- ✅ Comprehensive testing and validation
 
 ## Contributing
 

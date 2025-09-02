@@ -11,6 +11,8 @@ from .agents import ProfileAgent, AnalysisAgent, ResolutionAgent
 from .models.system import SystemProfile
 from .models.analysis import Analysis
 from .models.resolution import Resolution
+from .utils.config import Config
+from typing import Optional
 
 console = Console()
 
@@ -28,13 +30,29 @@ def main():
 @click.option('--gpu-mode', type=click.Choice(['strict', 'flexible', 'cpu_fallback']), default='flexible',
               help='GPU compatibility mode')
 @click.option('--output', type=click.Path(), help='Output directory for generated files')
-def check(repo_url, strategy, validate, gpu_mode, output):
+@click.option('--enable-llm/--disable-llm', default=None, help='Enable/disable LLM assistance')
+@click.option('--llm-url', help='LLM server URL (overrides config)')
+@click.option('--llm-model', help='LLM model name (overrides config)')
+def check(repo_url, strategy, validate, gpu_mode, output, enable_llm, llm_url, llm_model):
     """Check repository compatibility and generate environment."""
-    asyncio.run(_check_async(repo_url, strategy, validate, gpu_mode, output))
+    asyncio.run(_check_async(repo_url, strategy, validate, gpu_mode, output, enable_llm, llm_url, llm_model))
 
 
-async def _check_async(repo_url: str, strategy: str, validate: bool, gpu_mode: str, output: str):
+async def _check_async(repo_url: str, strategy: str, validate: bool, gpu_mode: str, output: str, 
+                      enable_llm: Optional[bool] = None, llm_url: Optional[str] = None, 
+                      llm_model: Optional[str] = None):
     """Async implementation of check command."""
+    # Load and configure settings
+    config = Config.load()
+    
+    # Override LLM settings from CLI options
+    if enable_llm is not None:
+        config.integrations.llm.enabled = enable_llm
+    if llm_url:
+        config.integrations.llm.base_url = llm_url
+    if llm_model:
+        config.integrations.llm.model = llm_model
+    
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
@@ -50,10 +68,14 @@ async def _check_async(repo_url: str, strategy: str, validate: bool, gpu_mode: s
         # Display system profile
         _display_system_profile(system_profile)
         
+        # Display LLM status if configured
+        if config.integrations.llm.enabled:
+            console.print(f"[dim]🤖 LLM assistance enabled: {config.integrations.llm.model}[/dim]")
+        
         # Step 2: Analyze repository
         analysis_task = progress.add_task("📦 Analyzing repository...", total=None)
         github_token = os.getenv('GITHUB_TOKEN')
-        analysis_agent = AnalysisAgent(github_token)
+        analysis_agent = AnalysisAgent(github_token, config)
         
         try:
             analysis = await analysis_agent.analyze(repo_url)
@@ -64,10 +86,10 @@ async def _check_async(repo_url: str, strategy: str, validate: bool, gpu_mode: s
             
             # Step 3: Generate resolution
             resolution_task = progress.add_task("💡 Generating solution...", total=None)
-            resolution_agent = ResolutionAgent()
+            resolution_agent = ResolutionAgent(config=config)
             
             try:
-                resolution = resolution_agent.resolve(analysis, strategy if strategy != 'auto' else None)
+                resolution = await resolution_agent.resolve(analysis, strategy if strategy != 'auto' else None)
                 progress.remove_task(resolution_task)
                 
                 # Display resolution
@@ -83,7 +105,7 @@ async def _check_async(repo_url: str, strategy: str, validate: bool, gpu_mode: s
                 if validate:
                     validation_task = progress.add_task("🧪 Validating solution...", total=None)
                     try:
-                        validation_result = resolution_agent.validate_solution(resolution, analysis)
+                        validation_result = await resolution_agent.validate_solution(resolution, analysis)
                         progress.remove_task(validation_task)
                         _display_validation_results(validation_result)
                     except Exception as e:
