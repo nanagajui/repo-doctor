@@ -12,6 +12,11 @@ license = {text = "MIT"}
 authors = [
     {name = "Your Name", email = "your.email@example.com"}
 ]
+urls = {
+    "Homepage" = "https://github.com/nanagajui/repo-doctor",
+    "Repository" = "https://github.com/nanagajui/repo-doctor.git",
+    "Issues" = "https://github.com/nanagajui/repo-doctor/issues"
+}
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
