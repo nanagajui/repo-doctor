@@ -30,6 +30,7 @@ class SoftwareStack(BaseModel):
     python_version: str
     pip_version: Optional[str] = None
     conda_version: Optional[str] = None
+    micromamba_version: Optional[str] = None
     docker_version: Optional[str] = None
     git_version: Optional[str] = None
     cuda_version: Optional[str] = None

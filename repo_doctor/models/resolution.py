@@ -11,6 +11,7 @@ class StrategyType(str, Enum):
 
     DOCKER = "docker"
     CONDA = "conda"
+    MICROMAMBA = "micromamba"
     VENV = "venv"
     DEVCONTAINER = "devcontainer"
 

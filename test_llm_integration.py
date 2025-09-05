@@ -33,7 +33,7 @@ async def test_llm_client():
 
     for url in test_urls:
         print(f"   Testing {url}...")
-        client = LLMClient(base_url=url, model="qwen/qwen3-4b-thinking-2507", timeout=5)
+        client = LLMClient(base_url=url, timeout=5)
 
         # Check availability
         if await client._check_availability():
@@ -53,8 +53,8 @@ async def test_llm_client():
     if not available:
         print("   ❌ No LLM server found at any tested URL")
         print("   💡 To start an LLM server:")
-        print("      - LM Studio: Load qwen/qwen3-4b-thinking-2507 and start server")
-        print("      - Ollama: ollama serve && ollama run qwen:3-4b-thinking")
+        print("      - LM Studio: Load model and start server")
+        print("      - Ollama: ollama serve && ollama run <model>")
         print("      - Or any OpenAI-compatible API server")
 
     return available
@@ -67,9 +67,8 @@ async def test_llm_analyzer():
     config = Config.load()
     config.integrations.llm.enabled = True
     config.integrations.llm.base_url = "http://172.29.96.1:1234/v1"
-    config.integrations.llm.model = "qwen/qwen3-4b-thinking-2507"
 
-    analyzer = LLMFactory.create_analyzer(config)
+    analyzer = await LLMFactory.create_analyzer(config)
 
     if not analyzer:
         print("   ❌ LLM Analyzer not available")
@@ -113,7 +112,6 @@ async def test_integration_workflow():
     config = Config.load()
     config.integrations.llm.enabled = True
     config.integrations.llm.base_url = "http://172.29.96.1:1234/v1"
-    config.integrations.llm.model = "qwen/qwen3-4b-thinking-2507"
 
     # Test with a simple repository (using a mock scenario)
     print("   Testing with mock repository analysis...")
@@ -139,7 +137,7 @@ async def test_integration_workflow():
         return False
 
 
-def test_configuration():
+async def test_configuration():
     """Test configuration system."""
     print("\n🧪 Testing Configuration System...")
 
@@ -151,8 +149,8 @@ def test_configuration():
     print(f"   - LLM URL: {config.integrations.llm.base_url}")
 
     # Test LLM factory
-    client = LLMFactory.create_client(config)
-    analyzer = LLMFactory.create_analyzer(config)
+    client = await LLMFactory.create_client(config)
+    analyzer = await LLMFactory.create_analyzer(config)
 
     print(f"   LLM Client Created: {'✅' if client else '❌'}")
     print(f"   LLM Analyzer Created: {'✅' if analyzer else '❌'}")
@@ -166,7 +164,7 @@ async def main():
     print("=" * 50)
 
     # Test configuration
-    config_ok = test_configuration()
+    config_ok = await test_configuration()
 
     # Test LLM client
     client_ok = await test_llm_client()
@@ -203,7 +201,7 @@ async def main():
     else:
         print("\n⚠️  Some tests failed. Check LLM server configuration.")
         print(
-            "   Make sure qwen/qwen3-4b-thinking-2507 is running on http://localhost:1234/v1"
+            "   Make sure your LLM model is running on http://localhost:1234/v1"
         )
 
 

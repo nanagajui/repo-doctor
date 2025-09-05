@@ -1,28 +1,30 @@
-"""ML-enhanced knowledge base with learning capabilities."""
+"""ML-enhanced knowledge base for Repo Doctor."""
 
-import time
+from typing import Dict, List, Optional, Any, Tuple
+import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional
 
 from ..knowledge.base import KnowledgeBase
+from .ml_data_storage import MLDataStorage
+from .feature_extractor import FeatureExtractor
+from .data_quality_validator import DataQualityValidator
+from .strategy_predictor import StrategySuccessPredictor, DependencyConflictPredictor
+from .pattern_discovery import PatternDiscoveryEngine
 from ..models.analysis import Analysis
 from ..models.resolution import Resolution, ValidationResult
 from ..models.system import SystemProfile
-from .feature_extractor import FeatureExtractor
-from .ml_data_storage import MLDataStorage
-from .data_quality_validator import DataQualityValidator
 
 
 class MLKnowledgeBase(KnowledgeBase):
-    """Enhanced knowledge base with ML-optimized data storage and learning capabilities."""
-
-    def __init__(self, storage_path: Path):
+    """Enhanced knowledge base with machine learning capabilities."""
+    
+    def __init__(self, storage_path: str):
         """Initialize ML-enhanced knowledge base."""
         super().__init__(storage_path)
         
         # Initialize ML components
         self.feature_extractor = FeatureExtractor()
-        self.ml_storage = MLDataStorage(storage_path / "ml_data")
+        self.ml_storage = MLDataStorage(Path(storage_path) / "ml_data")
         self.data_validator = DataQualityValidator()
         
         # Learning state

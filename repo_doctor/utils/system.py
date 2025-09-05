@@ -203,7 +203,7 @@ class SystemDetector:
                 "version": (
                     version_result.stdout.strip()
                     if version_result.returncode == 0
-                    else None
+                    else "unknown"
                 ),
             }
 
@@ -224,6 +224,44 @@ class SystemDetector:
                     pass
 
             return conda_info
+
+        except (subprocess.TimeoutExpired, subprocess.CalledProcessError):
+            return {"available": False}
+
+    @staticmethod
+    def get_micromamba_info() -> Optional[Dict[str, Any]]:
+        """Get Micromamba information."""
+        if not SystemDetector.check_command_available("micromamba"):
+            return None
+
+        try:
+            version_result = subprocess.run(
+                ["micromamba", "--version"], capture_output=True, text=True, timeout=5
+            )
+
+            info_result = subprocess.run(
+                ["micromamba", "info"], capture_output=True, text=True, timeout=10
+            )
+
+            micromamba_info = {
+                "available": True,
+                "version": (
+                    version_result.stdout.strip()
+                    if version_result.returncode == 0
+                    else "unknown"
+                ),
+            }
+
+            if info_result.returncode == 0:
+                # Parse micromamba info output
+                info_lines = info_result.stdout.strip().split('\n')
+                for line in info_lines:
+                    if 'platform' in line.lower():
+                        micromamba_info["platform"] = line.split(':')[-1].strip()
+                    elif 'channels' in line.lower():
+                        micromamba_info["channels"] = line.split(':')[-1].strip()
+
+            return micromamba_info
 
         except (subprocess.TimeoutExpired, subprocess.CalledProcessError):
             return {"available": False}

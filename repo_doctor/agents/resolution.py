@@ -16,7 +16,7 @@ from ..models.resolution import (
     ValidationResult,
     ValidationStatus,
 )
-from ..strategies import CondaStrategy, DockerStrategy, VenvStrategy
+from ..strategies import CondaStrategy, DockerStrategy, MicromambaStrategy, VenvStrategy
 from ..utils.config import Config
 from ..utils.llm import LLMAnalyzer, LLMFactory
 from ..validators import ContainerValidator
@@ -32,23 +32,24 @@ class ResolutionAgent:
     """Agent for generating solutions to compatibility issues."""
 
     def __init__(
-        self, knowledge_base_path: Optional[str] = None, config: Optional[Config] = None
+        self, config: Optional[Config] = None, knowledge_base_path: Optional[str] = None
     ):
         self.logger = get_logger(__name__)
-        self.strategies = [DockerStrategy(), CondaStrategy(), VenvStrategy()]
+        self.config = config or Config()
+        self.strategies = [DockerStrategy(), MicromambaStrategy(), CondaStrategy(), VenvStrategy()]
         self.validator = ContainerValidator()
 
         # Initialize knowledge base
         if knowledge_base_path:
             kb_path = Path(knowledge_base_path)
         else:
-            kb_path = Path.home() / ".repo-doctor" / "knowledge"
+            kb_path = Path(self.config.knowledge_base.location).expanduser() / "knowledge"
 
         self.knowledge_base = KnowledgeBase(kb_path)
 
         # Initialize LLM analyzer if configured
         self.config = config or Config.load()
-        self.llm_analyzer = LLMFactory.create_analyzer(self.config)
+        self.llm_analyzer = LLMFactory.create_analyzer_sync(self.config)
         
         # Initialize contract validation
         self.performance_monitor = AgentPerformanceMonitor()
@@ -109,7 +110,7 @@ class ResolutionAgent:
                 )
             
             # Log performance metrics
-            log_performance("resolution_generation", duration, agent="ResolutionAgent", strategy=strategy.type.value)
+            log_performance("resolution_generation", duration, agent="ResolutionAgent", strategy=strategy.strategy_type.value)
 
             return resolution
             

@@ -58,7 +58,7 @@ class TestRealRepositories:
         """Test complete analysis workflow on real repos."""
         # Profile system
         profile_agent = ProfileAgent()
-        system_profile = profile_agent.profile()
+        system_profile = await profile_agent.profile()
         
         assert system_profile is not None
         assert system_profile.hardware is not None
@@ -97,7 +97,7 @@ class TestRealRepositories:
         """Test that generated environments are valid."""
         # Quick analysis
         profile_agent = ProfileAgent()
-        system_profile = profile_agent.profile()
+        system_profile = await profile_agent.profile()
         
         analysis_agent = AnalysisAgent(config=config, use_cache=True)
         analysis = await analysis_agent.analyze(f"https://github.com/{repo_url}", system_profile)
@@ -136,7 +136,7 @@ class TestRealRepositories:
         async def profile_system():
             """Profile system in parallel."""
             profile_agent = ProfileAgent()
-            return profile_agent.profile()
+            return await profile_agent.profile()
         
         async def prepare_analysis():
             """Prepare analysis agent in parallel."""
@@ -156,7 +156,7 @@ class TestRealRepositories:
         # Run sequentially for comparison
         start_time = time.time()
         profile_agent = ProfileAgent()
-        system_profile_seq = profile_agent.profile()
+        system_profile_seq = await profile_agent.profile()
         analysis_agent_seq = AnalysisAgent(config=config, use_cache=True)
         sequential_time = time.time() - start_time
         
@@ -174,7 +174,7 @@ class TestRealRepositories:
         
         # First analysis
         profile_agent = ProfileAgent()
-        system_profile = profile_agent.profile()
+        system_profile = await profile_agent.profile()
         
         analysis_agent = AnalysisAgent(config=config, use_cache=True)
         analysis1 = await analysis_agent.analyze(repo_url, system_profile)
@@ -250,7 +250,7 @@ class PerformanceBenchmark:
         results = {}
         for size, repo in repos.items():
             profile_agent = ProfileAgent()
-            system_profile = profile_agent.profile()
+            system_profile = await profile_agent.profile()
             
             analysis_agent = AnalysisAgent(config=config, use_cache=True)
             

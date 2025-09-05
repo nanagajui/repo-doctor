@@ -6,6 +6,7 @@ from pathlib import Path
 
 from ..agents.analysis import AnalysisAgent
 from ..models.analysis import Analysis
+from ..models.system import SystemProfile
 from ..utils.config import Config
 from .ml_knowledge_base import MLKnowledgeBase
 from .adaptive_learning import AdaptiveLearningSystem
@@ -31,13 +32,13 @@ class EnhancedAnalysisAgent(AnalysisAgent):
         self.ml_enabled = True
         self.learning_confidence = 0.0
 
-    async def analyze(self, repo_url: str, **kwargs) -> Analysis:
+    async def analyze(self, repo_url: str, system_profile: Optional[SystemProfile] = None, **kwargs) -> Analysis:
         """Enhanced analysis with ML-powered insights."""
         start_time = time.time()
         
         try:
             # Perform standard analysis
-            analysis = await super().analyze(repo_url, **kwargs)
+            analysis = await super().analyze(repo_url, system_profile, **kwargs)
             
             # Enhance with ML capabilities
             if self.ml_enabled:

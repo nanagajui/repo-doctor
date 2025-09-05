@@ -1,4 +1,4 @@
-e veno Doctor
+Repo Doctor
 
 A sophisticated CLI tool that diagnoses and resolves GitHub repository compatibility issues with local development environments, specifically targeting ML/AI repositories with complex GPU dependencies.
 
@@ -12,7 +12,7 @@ A sophisticated CLI tool that diagnoses and resolves GitHub repository compatibi
 - **⚡ Parallel Agent Execution** for faster analysis workflows
 - **🧠 Enhanced Agents** with ML capabilities and pattern discovery
 - **📈 Performance Monitoring** with real-time metrics and optimization
-- **🔧 Automated environment generation** (Docker, Conda, venv)
+- **🔧 Automated environment generation** (Docker, Conda, Micromamba, venv)
 - **🎮 GPU-aware** compatibility checking for ML workloads
 - **🏗️ Three-agent architecture** for comprehensive analysis
 - **🤖 LLM Integration** with qwen/qwen3-4b-thinking-2507 for enhanced analysis
@@ -39,6 +39,7 @@ repo_doctor/
 ├── strategies/      # Environment generation strategies
 │   ├── docker.py    # Docker containers
 │   ├── conda.py     # Conda environments
+│   ├── micromamba.py # Micromamba environments (2-3x faster)
 │   └── venv.py      # Virtual environments
 ├── knowledge/       # Learning system
 ├── validators/      # Solution validation

@@ -244,8 +244,8 @@ async def _check_async(
                 async def profile_system():
                     """Profile system in parallel."""
                     profile_agent = ProfileAgent(config)
-                    # Run synchronous profiling in thread pool for proper async boundary
-                    return await asyncio.to_thread(profile_agent.profile)
+                    # Use new async profile method
+                    return await profile_agent.profile()
                 
                 async def prepare_analysis():
                     """Prepare analysis agent in parallel."""
@@ -256,9 +256,9 @@ async def _check_async(
                     learning_enabled = (hasattr(config, 'learning') and 
                                       getattr(config.learning, 'enabled', False)) or config.integrations.llm.enabled
                     if LEARNING_AVAILABLE and learning_enabled:
-                        return EnhancedAnalysisAgent(github_token, config, use_cache=True)
+                        return EnhancedAnalysisAgent(config, github_token, use_cache=True)
                     else:
-                        return AnalysisAgent(github_token, config, use_cache=True)
+                        return AnalysisAgent(config, github_token, use_cache=True)
                 
                 # Run both tasks in parallel
                 profile_future = asyncio.create_task(profile_system())
@@ -278,8 +278,9 @@ async def _check_async(
 
                 # Display LLM status if configured
                 if config.integrations.llm.enabled:
+                    llm_url = config.integrations.llm.base_url or "auto-detected"
                     console.print(
-                        f"[dim]🤖 LLM assistance enabled: {config.integrations.llm.model}[/dim]"
+                        f"[dim]🤖 LLM assistance enabled: {config.integrations.llm.model} @ {llm_url}[/dim]"
                     )
                     
             except Exception as e:
@@ -287,7 +288,7 @@ async def _check_async(
                 console.print(f"[yellow]⚠[/yellow] Parallel initialization failed: {str(e)}")
                 # Fall back to sequential execution
                 profile_agent = ProfileAgent(config)
-                system_profile = profile_agent.profile()
+                system_profile = profile_agent.profile_sync()
                 github_token = EnvLoader.get_github_token()
                 _check_token_configuration()
                 
@@ -295,9 +296,9 @@ async def _check_async(
                 learning_enabled = (hasattr(config, 'learning') and 
                                   getattr(config.learning, 'enabled', False)) or config.integrations.llm.enabled
                 if LEARNING_AVAILABLE and learning_enabled:
-                    analysis_agent = EnhancedAnalysisAgent(github_token, config, use_cache=True)
+                    analysis_agent = EnhancedAnalysisAgent(config, github_token, use_cache=True)
                 else:
-                    analysis_agent = AnalysisAgent(github_token, config, use_cache=True)
+                    analysis_agent = AnalysisAgent(config, github_token, use_cache=True)
 
             # Step 2: Analyze repository (now with pre-initialized agent)
             analysis_task = progress.add_task("📦 Analyzing repository...", total=None)
@@ -672,6 +673,60 @@ def tokens(github: bool, hf: bool) -> None:
 
 
 @main.command()
+def llm() -> None:
+    """Test LLM discovery and connection."""
+    from .utils.llm_discovery import smart_llm_config
+    from .utils.llm import LLMClient
+    import asyncio
+    
+    async def test_llm():
+        console.print("[bold blue]🤖 LLM Discovery and Connection Test[/bold blue]\n")
+        
+        # Test discovery
+        discovery_result = await smart_llm_config.get_config()
+        
+        if discovery_result.get("enabled", False):
+            console.print(f"[green]✅ LLM Server Found![/green]")
+            console.print(f"   URL: {discovery_result['base_url']}")
+            console.print(f"   Model: {discovery_result['model']}")
+            console.print(f"   Discovery Method: {discovery_result.get('discovery_method', 'unknown')}")
+            
+            if 'server_info' in discovery_result:
+                server_info = discovery_result['server_info']
+                console.print(f"   Server Type: {server_info.get('server_type', 'unknown')}")
+                console.print(f"   Models Available: {server_info.get('model_count', 0)}")
+            
+            # Test connection
+            console.print(f"\n[blue]Testing connection...[/blue]")
+            client = LLMClient(use_smart_discovery=True)
+            available = await client._check_availability()
+            
+            if available:
+                console.print(f"[green]✅ Connection successful![/green]")
+                
+                # Test completion
+                console.print(f"[blue]Testing completion...[/blue]")
+                try:
+                    response = await client.generate_completion(
+                        "What is Python? Answer in one sentence.",
+                        max_tokens=50
+                    )
+                    if response:
+                        console.print(f"[green]✅ Response: {response[:100]}...[/green]")
+                    else:
+                        console.print(f"[yellow]⚠ No response received[/yellow]")
+                except Exception as e:
+                    console.print(f"[red]❌ Completion failed: {e}[/red]")
+            else:
+                console.print(f"[red]❌ Connection failed[/red]")
+        else:
+            console.print(f"[red]❌ No LLM server found[/red]")
+            console.print(f"[dim]Make sure an LLM server is running on one of the candidate URLs[/dim]")
+    
+    asyncio.run(test_llm())
+
+
+@main.command()
 def health() -> None:
     """Check system health and agent status."""
     from .agents.contracts import AgentHealthMonitor
@@ -685,8 +740,8 @@ def health() -> None:
     
     # Check Profile Agent
     try:
-        profile_agent = ProfileAgent()
-        profile = profile_agent.profile()
+        profile_agent = ProfileAgent(config)
+        profile = profile_agent.profile_sync()
         health_monitor.check_agent_health("profile_agent", "healthy", {
             "compute_score": profile.compute_score,
             "has_gpu": profile.has_gpu(),
@@ -698,7 +753,7 @@ def health() -> None:
     # Check Analysis Agent (basic connectivity)
     try:
         github_token = EnvLoader.get_github_token()
-        analysis_agent = AnalysisAgent(github_token, config)
+        analysis_agent = AnalysisAgent(config, github_token)
         
         if analysis_agent.github_helper:
             rate_limit = analysis_agent.github_helper.check_rate_limit()

@@ -45,18 +45,22 @@ class AdvancedConfig(BaseModel):
     default_docker_size_mb: int = 2048
     default_venv_size_mb: int = 512
     default_python_version: str = "3.10"
+    
+    # Cache configuration
+    cache_enabled: bool = True
 
 
 class LLMConfig(BaseModel):
-    """LLM integration configuration."""
+    """LLM integration configuration with smart discovery."""
 
-    enabled: bool = False
-    base_url: str = "http://localhost:1234/v1"
+    enabled: bool = True
+    base_url: Optional[str] = None  # None means use smart discovery
     api_key: Optional[str] = None
-    model: str = "qwen/qwen3-4b-thinking-2507"
+    model: str = "openai/gpt-oss-20b"
     timeout: int = 30
     max_tokens: int = 512
     temperature: float = 0.1
+    use_smart_discovery: bool = True  # Enable smart discovery by default
 
 
 class IntegrationsConfig(BaseModel):

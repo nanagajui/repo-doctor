@@ -19,15 +19,16 @@ integrations:
   # GitHub token for private repos and higher rate limits
   github_token: ${GITHUB_TOKEN}
   
-  # LLM Integration Settings
+  # LLM Integration Settings with Smart Discovery
   llm:
     enabled: true  # Enable LLM assistance
-    base_url: http://localhost:1234/v1  # LLM server URL
+    base_url: null  # null = auto-detect, or specify URL like http://172.29.96.1:1234/v1
     api_key: ${LLM_API_KEY}  # Optional API key
     model: qwen/qwen3-4b-thinking-2507  # Model name
     timeout: 30  # Request timeout in seconds
     max_tokens: 512  # Maximum tokens per request
     temperature: 0.1  # Temperature for generation (0.0-1.0)
+    use_smart_discovery: true  # Enable smart server discovery (WSL, localhost, custom)
   
   # Legacy LLM fallback setting (deprecated, use llm.enabled instead)
   use_llm_fallback: false

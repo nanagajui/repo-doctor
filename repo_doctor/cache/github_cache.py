@@ -360,6 +360,10 @@ class CachedGitHubHelper:
         
         return result
     
+    def parse_repo_url(self, url: str) -> Dict[str, str]:
+        """Parse repository URL to extract owner and repo name."""
+        return self.helper.parse_repo_url(url)
+    
     def get_cache_stats(self) -> Dict[str, Any]:
         """Get cache statistics."""
         return self.cache.get_stats()

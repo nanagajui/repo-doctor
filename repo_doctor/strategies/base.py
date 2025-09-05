@@ -27,5 +27,9 @@ class BaseStrategy(ABC):
     def _create_strategy_config(self, **kwargs) -> Strategy:
         """Create strategy configuration."""
         return Strategy(
-            type=self.strategy_type, priority=self.priority, requirements=kwargs
+            type=self.strategy_type, 
+            priority=self.priority, 
+            requirements=kwargs,
+            can_handle_gpu=kwargs.get('can_handle_gpu', False),
+            estimated_setup_time=kwargs.get('estimated_setup_time', 0)
         )

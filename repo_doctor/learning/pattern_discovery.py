@@ -7,7 +7,10 @@ import numpy as np
 from dataclasses import dataclass
 
 from .ml_data_storage import MLDataStorage
-from .ml_knowledge_base import MLKnowledgeBase
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .ml_knowledge_base import MLKnowledgeBase
 
 
 @dataclass
@@ -26,7 +29,7 @@ class DiscoveredPattern:
 class PatternDiscoveryEngine:
     """Discover patterns and insights from analysis data."""
 
-    def __init__(self, knowledge_base: MLKnowledgeBase):
+    def __init__(self, knowledge_base: "MLKnowledgeBase"):
         """Initialize pattern discovery engine."""
         self.kb = knowledge_base
         self.ml_storage = knowledge_base.ml_storage

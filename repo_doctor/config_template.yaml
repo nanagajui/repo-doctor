@@ -31,7 +31,7 @@ strategy: auto  # auto, docker, conda, venv
 # llm:
 #   enabled: false
 #   # base_url: http://localhost:1234/v1
-#   # model: qwen/qwen3-4b-thinking-2507
+#   # model: openai/gpt-oss-20b
 #   
 # # Performance tuning (optional)
 # performance:

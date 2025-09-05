@@ -38,12 +38,13 @@ class AnalysisAgent:
     """Agent for analyzing repositories."""
 
     def __init__(
-        self, github_token: Optional[str] = None, config: Optional[Config] = None, 
+        self, config: Optional[Config] = None, github_token: Optional[str] = None,
         use_cache: bool = True
     ):
         self.logger = get_logger(__name__)
+        self.config = config or Config()
         # Use EnvLoader if no token provided
-        token = github_token or EnvLoader.get_github_token()
+        token = github_token or self.config.integrations.github_token or EnvLoader.get_github_token()
         self.github = Github(token) if token else Github()
         self.github_helper = GitHubHelper(token)
         
@@ -60,7 +61,7 @@ class AnalysisAgent:
 
         # Initialize LLM analyzer if configured
         self.config = config or Config.load()
-        self.llm_analyzer = LLMFactory.create_analyzer(self.config)
+        self.llm_analyzer = LLMFactory.create_analyzer_sync(self.config)
         
         # Initialize conflict detection system
         self.conflict_detector = MLPackageConflictDetector()

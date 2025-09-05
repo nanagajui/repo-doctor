@@ -1,9 +1,10 @@
 """Profile Agent - System profiling and capability detection."""
 
+import asyncio
 import platform
 import subprocess
 import time
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 import psutil
 
@@ -15,24 +16,19 @@ from ..utils.logging_config import get_logger, log_performance
 class ProfileAgent:
     """Agent for profiling system capabilities."""
 
-    def __init__(self, config=None):
+    def __init__(self, config: Optional[Any] = None) -> None:
         from ..utils.config import Config
         self.config = config or Config.load()
         self.performance_monitor = AgentPerformanceMonitor(self.config)
         self.logger = get_logger(__name__)
 
-    def profile(self) -> SystemProfile:
-        """Generate complete system profile with contract validation."""
+    async def profile(self) -> SystemProfile:
+        """Generate complete system profile with contract validation (async)."""
         start_time = time.time()
         
         try:
-            profile = SystemProfile(
-                hardware=self._get_hardware_info(),
-                software=self._get_software_stack(),
-                platform=platform.system().lower(),
-                container_runtime=self._detect_container_runtime(),
-                compute_score=self._calculate_compute_score(),
-            )
+            # Run CPU-intensive operations in thread pool
+            profile = await asyncio.to_thread(self._profile_sync)
             
             # Validate the profile against contracts
             AgentContractValidator.validate_system_profile(profile)
@@ -48,10 +44,22 @@ class ProfileAgent:
             log_performance("system_profile", duration, agent="ProfileAgent")
             
             return profile
-            
         except Exception as e:
-            # Handle errors with fallback profile
-            return AgentErrorHandler.handle_profile_error(e, "profile_generation")
+            return AgentErrorHandler.handle_profile_error(e, "system_profiling")
+    
+    def _profile_sync(self) -> SystemProfile:
+        """Synchronous profiling implementation."""
+        return SystemProfile(
+            hardware=self._get_hardware_info(),
+            software=self._get_software_stack(),
+            platform=platform.system().lower(),
+            container_runtime=self._detect_container_runtime(),
+            compute_score=self._calculate_compute_score(),
+        )
+    
+    def profile_sync(self) -> SystemProfile:
+        """Synchronous profile method for backward compatibility."""
+        return self._profile_sync()
 
     def _get_hardware_info(self) -> HardwareInfo:
         """Get hardware information."""
@@ -83,10 +91,11 @@ class ProfileAgent:
             
         return SoftwareStack(
             python_version=python_version,
-            pip_version=self._get_command_version("pip --version"),
-            conda_version=self._get_command_version("conda --version"),
-            docker_version=self._get_command_version("docker --version"),
-            git_version=self._get_command_version("git --version"),
+            pip_version=self._run_command(["pip", "--version"]),
+            conda_version=self._run_command(["conda", "--version"]),
+            micromamba_version=self._run_command(["micromamba", "--version"]),
+            docker_version=self._run_command(["docker", "--version"]),
+            git_version=self._run_command(["git", "--version"]),
             cuda_version=self._detect_cuda_version(),
         )
 
@@ -176,11 +185,11 @@ class ProfileAgent:
                 continue
         return None
 
-    def _get_command_version(self, command: str) -> Optional[str]:
+    def _run_command(self, command: List[str], timeout: int = 5) -> Optional[str]:
         """Get version from command output."""
         try:
             result = subprocess.run(
-                command.split(), capture_output=True, text=True, timeout=self.config.advanced.version_check_timeout
+                command, capture_output=True, text=True, timeout=timeout
             )
             if result.returncode == 0:
                 # Extract version number from output
