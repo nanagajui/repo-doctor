@@ -20,7 +20,7 @@ class EnhancedAnalysisAgent(AnalysisAgent):
     def __init__(self, github_token: Optional[str] = None, config: Optional[Config] = None, 
                  use_cache: bool = True, knowledge_base_path: Optional[str] = None):
         """Initialize enhanced analysis agent."""
-        super().__init__(github_token, config, use_cache)
+        super().__init__(config=config, github_token=github_token, use_cache=use_cache)
         
         # Initialize ML components
         self.ml_kb = MLKnowledgeBase(Path(knowledge_base_path) if knowledge_base_path else Path.home() / ".repo-doctor" / "knowledge")

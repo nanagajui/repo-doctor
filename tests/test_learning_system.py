@@ -22,7 +22,7 @@ from repo_doctor.learning import (
 )
 from repo_doctor.models.analysis import Analysis, RepositoryInfo, DependencyInfo
 from repo_doctor.models.resolution import Resolution, Strategy, StrategyType, ValidationResult, ValidationStatus
-from repo_doctor.models.system import SystemProfile, HardwareInfo, SoftwareInfo, GPUInfo
+from repo_doctor.models.system import SystemProfile, HardwareInfo, SoftwareStack, GPUInfo
 
 
 def create_sample_analysis() -> Analysis:
@@ -92,25 +92,26 @@ def create_sample_system_profile() -> SystemProfile:
     """Create a sample system profile for testing."""
     # Create hardware info
     hardware = HardwareInfo(
-        cpu_cores=16,
-        memory_gb=32,
+        cpu_cores=8,
+        memory_gb=16.0,
         architecture="x86_64",
         gpus=[
             GPUInfo(
-                name="NVIDIA GeForce RTX 4090",
-                memory_gb=24,
-                vendor="nvidia",
-                cuda_capability="8.9"
+                name="NVIDIA RTX 3080",
+                memory_gb=10.0,
+                cuda_version="11.8"
             )
         ]
     )
     
     # Create software info
-    software = SoftwareInfo(
-        python_version="3.9.7",
-        cuda_version="11.8",
-        pip_version="22.0.0",
-        conda_version="4.12.0"
+    software = SoftwareStack(
+        python_version="3.9.0",
+        pip_version="21.0.1",
+        conda_version="4.10.3",
+        docker_version="20.10.7",
+        git_version="2.32.0",
+        cuda_version="11.8"
     )
     
     # Create system profile

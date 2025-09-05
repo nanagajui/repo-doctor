@@ -327,8 +327,26 @@ class ImportScanner:
 class RepositoryParser:
     """Main repository parser that coordinates all parsing strategies."""
 
-    def __init__(self, github_helper):
-        self.github_helper = github_helper
+    def __init__(self, github_backend):
+        # github_backend can be:
+        # - an object with attribute `.github` exposing a PyGithub client (e.g., AnalysisAgent, GitHubHelper)
+        # - a PyGithub client itself exposing `.get_repo`
+        # - or a wrapper with `.get_repo`
+        self._backend = github_backend
+
+    def _get_repo(self, owner: str, name: str):
+        # Prefer `.github` attribute if present
+        client = getattr(self._backend, "github", None)
+        if client and hasattr(client, "get_repo"):
+            return client.get_repo(f"{owner}/{name}")
+        # Fallback: backend itself may be a client
+        if hasattr(self._backend, "get_repo"):
+            return self._backend.get_repo(f"{owner}/{name}")
+        # Last resort: try nested `.github_helper.github`
+        helper = getattr(self._backend, "github_helper", None)
+        if helper and hasattr(helper, "github") and hasattr(helper.github, "get_repo"):
+            return helper.github.get_repo(f"{owner}/{name}")
+        raise RuntimeError("No GitHub client available in RepositoryParser backend")
 
     async def parse_repository_files(
         self, owner: str, name: str
@@ -363,7 +381,7 @@ class RepositoryParser:
     ) -> Optional[str]:
         """Get file content from GitHub repository."""
         try:
-            repo = self.github_helper.github.get_repo(f"{owner}/{name}")
+            repo = self._get_repo(owner, name)
             file_content = repo.get_contents(filename)
             return file_content.decoded_content.decode("utf-8")
         except Exception:
@@ -376,7 +394,7 @@ class RepositoryParser:
         python_files = []
 
         try:
-            repo = self.github_helper.github.get_repo(f"{owner}/{name}")
+            repo = self._get_repo(owner, name)
             contents = repo.get_contents("")
 
             count = 0

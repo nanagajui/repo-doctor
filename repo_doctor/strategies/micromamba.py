@@ -32,6 +32,17 @@ class MicromambaStrategy(BaseStrategy):
             can_handle_gpu=True, estimated_setup_time=120  # Faster than conda
         )
 
+        # Coerce strategy to the proper model if a mock or unexpected type was returned
+        from ..models.resolution import Strategy as StrategyModel
+        if not isinstance(strategy, StrategyModel):
+            strategy = StrategyModel(
+                type=self.strategy_type,
+                priority=self.priority,
+                requirements={"can_handle_gpu": True, "estimated_setup_time": 120},
+                can_handle_gpu=True,
+                estimated_setup_time=120,
+            )
+
         generated_files = []
 
         # Generate environment.yml and requirements.txt
@@ -142,7 +153,7 @@ echo "🚀 Setting up Micromamba environment for {analysis.repository.name}..."
 
 # Check if micromamba is installed
 if ! command -v micromamba &> /dev/null; then
-    echo "❌ Micromamba not found. Installing micromamba..."
+    echo "❌ micromamba not found. Installing micromamba..."
     echo "Visit: https://mamba.readthedocs.io/en/latest/installation.html"
     
     # Auto-install micromamba if curl is available

@@ -22,27 +22,52 @@ class ProfileAgent:
         self.performance_monitor = AgentPerformanceMonitor(self.config)
         self.logger = get_logger(__name__)
 
-    async def profile(self) -> SystemProfile:
-        """Generate complete system profile with contract validation (async)."""
+    def profile(self) -> SystemProfile:
+        """Generate complete system profile with contract validation (sync).
+
+        This synchronous interface is required by tests and CLI contexts.
+        For async usage, use `profile_async`.
+        """
         start_time = time.time()
-        
+
         try:
-            # Run CPU-intensive operations in thread pool
-            profile = await asyncio.to_thread(self._profile_sync)
-            
+            # Run synchronously
+            profile = self._profile_sync()
+
             # Validate the profile against contracts
             AgentContractValidator.validate_system_profile(profile)
-            
+
             # Check performance
             duration = time.time() - start_time
             if not self.performance_monitor.check_profile_performance(duration):
                 self.logger.warning(
                     f"Profile agent took {duration:.2f}s (target: {self.performance_monitor.performance_targets['profile_agent']}s)"
                 )
-            
+
             # Log performance metrics
             log_performance("system_profile", duration, agent="ProfileAgent")
-            
+
+            return profile
+        except Exception as e:
+            return AgentErrorHandler.handle_profile_error(e, "system_profiling")
+
+    async def profile_async(self) -> SystemProfile:
+        """Async variant of profile to integrate with async workflows."""
+        start_time = time.time()
+
+        try:
+            profile = await asyncio.to_thread(self._profile_sync)
+
+            AgentContractValidator.validate_system_profile(profile)
+
+            duration = time.time() - start_time
+            if not self.performance_monitor.check_profile_performance(duration):
+                self.logger.warning(
+                    f"Profile agent took {duration:.2f}s (target: {self.performance_monitor.performance_targets['profile_agent']}s)"
+                )
+
+            log_performance("system_profile", duration, agent="ProfileAgent")
+
             return profile
         except Exception as e:
             return AgentErrorHandler.handle_profile_error(e, "system_profiling")

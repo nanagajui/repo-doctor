@@ -4,6 +4,8 @@
 import asyncio
 import time
 from pathlib import Path
+from unittest.mock import patch, MagicMock
+from github import Github, GithubException
 
 from repo_doctor.agents.profile import ProfileAgent
 from repo_doctor.agents.analysis import AnalysisAgent
@@ -16,7 +18,8 @@ from repo_doctor.agents.contracts import (
 from repo_doctor.knowledge import KnowledgeBase
 
 
-async def test_complete_agent_workflow():
+@patch('repo_doctor.agents.analysis.Github')
+async def test_complete_agent_workflow(mock_github):
     """Test the complete workflow from profile to resolution."""
     print("🚀 Starting Repo Doctor Agent Integration Test")
     print("=" * 60)
@@ -54,6 +57,10 @@ async def test_complete_agent_workflow():
     else:
         print(f"⚠️  Profile performance exceeded target ({profile_duration:.2f}s > 2.0s)")
     
+    mock_repo = MagicMock()
+    mock_repo.get_contents.side_effect = GithubException(404, 'Not Found', {})
+    mock_github.return_value.get_repo.return_value = mock_repo
+
     # Step 2: Analysis Agent
     print("\n🔍 Step 2: Repository Analysis")
     print("-" * 30)
@@ -112,7 +119,7 @@ async def test_complete_agent_workflow():
     
     start_time = time.time()
     resolution_agent = ResolutionAgent()
-    resolution = await resolution_agent.resolve(analysis, "docker")
+    resolution = resolution_agent.resolve(analysis, "docker")
     resolution_duration = time.time() - start_time
     
     print(f"✅ Resolution generated in {resolution_duration:.2f}s")

@@ -2,6 +2,7 @@
 """Test script for smart LLM discovery system."""
 
 import asyncio
+import platform
 import sys
 from pathlib import Path
 

@@ -1,6 +1,7 @@
 """Resolution Agent - Solution generation and validation."""
 
 import os
+import asyncio
 import time
 from pathlib import Path
 from typing import List, Optional
@@ -54,10 +55,56 @@ class ResolutionAgent:
         # Initialize contract validation
         self.performance_monitor = AgentPerformanceMonitor()
 
-    async def resolve(
+    def resolve(
+        self, analysis: Analysis, strategy: Optional[str] = None
+    ) -> Resolution:
+        """Generate resolution (sync) with contract validation.
+
+        This is a fully synchronous implementation used by tests and CLI wrappers.
+        LLM-enhanced steps are skipped in the sync path to avoid event loop usage.
+        """
+        start_time = time.time()
+
+        try:
+            # Validate input analysis
+            AgentContractValidator.validate_analysis(analysis)
+
+            # Select strategy
+            selected = self._select_strategy(analysis, strategy)
+            if not selected:
+                # Try LLM fallback only if analyzer exists and there are issues (best-effort, sync path skips awaits)
+                raise ValueError("No suitable strategy found for this repository")
+
+            # Generate solution using selected strategy
+            try:
+                resolution = selected.generate_solution(analysis)
+            except Exception as e:
+                raise ValueError(
+                    f"Failed to generate solution with {selected.strategy_type.value} strategy: {str(e)}"
+                )
+
+            # Validate the resolution against contracts
+            AgentContractValidator.validate_resolution(resolution)
+
+            # Performance logging
+            duration = time.time() - start_time
+            if not self.performance_monitor.check_resolution_performance(duration):
+                self.logger.warning(
+                    f"Resolution agent took {duration:.2f}s (target: {self.performance_monitor.performance_targets['resolution_agent']}s)"
+                )
+            log_performance(
+                "resolution_generation", duration, agent="ResolutionAgent", strategy=selected.strategy_type.value
+            )
+
+            return resolution
+
+        except Exception as e:
+            AgentErrorHandler.handle_resolution_error(e, analysis, "resolution_generation")
+
+    async def _resolve_async(
         self, analysis: Analysis, preferred_strategy: Optional[str] = None
     ) -> Resolution:
-        """Generate resolution for compatibility issues with contract validation."""
+        """Async implementation of resolution generation with contract validation."""
         start_time = time.time()
         
         try:

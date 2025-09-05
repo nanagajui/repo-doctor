@@ -42,6 +42,8 @@ class TestLearningIntegration:
         analysis.dependencies = []
         analysis.compatibility_issues = []
         analysis.confidence_score = 0.8
+        analysis.analysis_time = 1.0
+        analysis.cuda_version_required = None
         analysis.model_dump.return_value = {
             "repository": {"name": "test-repo", "url": "https://github.com/test/test-repo"},
             "dependencies": [],
@@ -93,7 +95,9 @@ class TestLearningIntegration:
             
             assert result is not None
             # ML enhancement should add additional insights
-            assert hasattr(result, 'ml_insights') or hasattr(result, 'learning_confidence')
+            # ML enhancement should add additional insights
+            assert hasattr(result, 'ml_insights')
+            assert hasattr(result, 'learning_confidence')
     
     @pytest.mark.asyncio
     async def test_enhanced_resolution_with_ml(self, temp_kb_path, config, mock_analysis, mock_system_profile):
@@ -140,7 +144,7 @@ class TestLearningIntegration:
         ml_kb = MLKnowledgeBase(temp_kb_path)
         dashboard = LearningDashboard(ml_kb)
         
-        insights = dashboard.get_recent_insights(limit=5)
+        insights = dashboard.get_learning_insights(limit=5)
         
         assert isinstance(insights, list)
         # Should return empty list for new knowledge base
@@ -180,7 +184,22 @@ class TestLearningIntegration:
     async def test_learning_system_with_real_data(self, temp_kb_path, config):
         """Test learning system with realistic data."""
         # Create a more realistic analysis
-        analysis_data = {
+        analysis = Mock(spec=Analysis)
+        analysis.repository = Mock()
+        analysis.repository.name = "pytorch-example"
+        analysis.repository.url = "https://github.com/pytorch/examples"
+        analysis.repository.stars = 1000
+        analysis.repository.topics = ["pytorch", "deep-learning", "computer-vision"]
+        analysis.dependencies = [
+            Mock(name="torch", version="1.12.0", type="ml"),
+            Mock(name="torchvision", version="0.13.0", type="ml"),
+            Mock(name="numpy", version="1.21.0", type="scientific"),
+        ]
+        analysis.compatibility_issues = [
+            Mock(type="cuda_version", severity="medium", description="CUDA version mismatch")
+        ]
+        analysis.confidence_score = 0.85
+        analysis_data_dict = {
             "repository": {
                 "name": "pytorch-example",
                 "url": "https://github.com/pytorch/examples",
@@ -197,22 +216,23 @@ class TestLearningIntegration:
             ],
             "confidence_score": 0.85
         }
-        
+        analysis.model_dump.return_value = analysis_data_dict
+
         # Test ML knowledge base with real data
         ml_kb = MLKnowledgeBase(temp_kb_path)
         
         # Test feature extraction
-        features = ml_kb.feature_extractor.extract_features(analysis_data, {})
+        features = ml_kb.feature_extractor.extract_repository_features(analysis)
         assert features is not None
         assert len(features) > 0
         
         # Test pattern discovery
-        patterns = ml_kb.pattern_engine.discover_patterns([analysis_data])
+        patterns = ml_kb.pattern_engine.discover_patterns([analysis_data_dict])
         assert isinstance(patterns, list)
         
         # Test learning system
         learning_system = ml_kb.learning_system
-        recommendations = learning_system.get_adaptive_recommendations(analysis_data, {})
+        recommendations = learning_system.get_adaptive_recommendations(analysis_data_dict, {})
         assert isinstance(recommendations, list)
 
 

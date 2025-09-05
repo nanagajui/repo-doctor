@@ -21,7 +21,7 @@ class EnhancedResolutionAgent(ResolutionAgent):
 
     def __init__(self, knowledge_base_path: Optional[str] = None, config: Optional[Config] = None):
         """Initialize enhanced resolution agent."""
-        super().__init__(knowledge_base_path, config)
+        super().__init__(config=config, knowledge_base_path=knowledge_base_path)
         
         # Initialize ML components
         self.ml_kb = MLKnowledgeBase(Path(knowledge_base_path) if knowledge_base_path else Path.home() / ".repo-doctor" / "knowledge")

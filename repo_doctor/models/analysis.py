@@ -1,7 +1,7 @@
 """Repository analysis models."""
 
 from enum import Enum
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Any
 
 from pydantic import BaseModel, Field
 
@@ -65,6 +65,8 @@ class Analysis(BaseModel):
     compatibility_issues: List[CompatibilityIssue] = Field(default_factory=list)
     analysis_time: float = 0.0
     confidence_score: float = 0.0
+    ml_insights: Optional[List[Dict[str, Any]]] = None
+    learning_confidence: Optional[float] = None
 
     def get_critical_issues(self) -> List[CompatibilityIssue]:
         """Get critical compatibility issues."""

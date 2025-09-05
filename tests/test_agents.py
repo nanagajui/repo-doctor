@@ -1,6 +1,7 @@
 """Test suite for agents."""
 
 from unittest.mock import MagicMock, patch
+from github import GithubException
 
 import pytest
 
@@ -89,28 +90,20 @@ class TestAnalysisAgent:
             compute_score=100,
         )
 
+    @patch('repo_doctor.agents.analysis.Github')
     @pytest.mark.asyncio
-    async def test_analysis_creation(self, mock_profile):
+    async def test_analysis_creation(self, mock_github, mock_profile):
         """Test that AnalysisAgent creates a valid analysis."""
+        mock_repo = MagicMock()
+        mock_repo.get_contents.side_effect = GithubException(404, 'Not Found', {})
+        mock_github.return_value.get_repo.return_value = mock_repo
+
         agent = AnalysisAgent()
+        analysis = await agent.analyze("https://github.com/test/repo")
 
-        mock_repo_data = {"owner": "test", "name": "repo"}
-        mock_repo_info = {
-            "name": "repo",
-            "description": "Test repository",
-            "stars": 0,
-            "language": "Python",
-            "topics": []
-        }
-        
-        with patch.object(agent.github_helper, "parse_repo_url", return_value=mock_repo_data):
-            with patch.object(agent.github_helper, "get_repo_info", return_value=mock_repo_info):
-                with patch.object(agent.repo_parser, "parse_repository_files", return_value=[]):
-                    analysis = await agent.analyze("https://github.com/test/repo")
-
-                    assert isinstance(analysis, Analysis)
-                    assert analysis.repository is not None
-                    assert analysis.confidence_score >= 0
+        assert isinstance(analysis, Analysis)
+        assert analysis.repository is not None
+        assert analysis.confidence_score >= 0
 
     @pytest.mark.asyncio
     async def test_dependency_extraction(self, mock_profile):
@@ -209,11 +202,10 @@ class TestResolutionAgent:
             confidence_score=0.8,
         )
 
-    @pytest.mark.asyncio
-    async def test_resolution_creation(self, mock_analysis):
+    def test_resolution_creation(self, mock_analysis):
         """Test that ResolutionAgent creates a valid resolution."""
         agent = ResolutionAgent()
-        resolution = await agent.resolve(mock_analysis, preferred_strategy="docker")
+        resolution = agent.resolve(mock_analysis, strategy="docker")
 
         assert resolution is not None
         assert resolution.strategy is not None
@@ -228,12 +220,11 @@ class TestResolutionAgent:
         assert strategy is not None
         assert hasattr(strategy, 'strategy_type')
 
-    @pytest.mark.asyncio
-    async def test_docker_file_generation(self, mock_analysis):
+    def test_docker_file_generation(self, mock_analysis):
         """Test Docker file generation."""
         agent = ResolutionAgent()
 
-        resolution = await agent.resolve(mock_analysis, preferred_strategy="docker")
+        resolution = agent.resolve(mock_analysis, strategy="docker")
         assert resolution is not None
         assert len(resolution.generated_files) > 0
 
@@ -242,8 +233,9 @@ class TestResolutionAgent:
 class TestAgentIntegration:
     """Integration tests for the three-agent system."""
 
+    @patch('repo_doctor.agents.analysis.Github')
     @pytest.mark.asyncio
-    async def test_full_pipeline(self):
+    async def test_full_pipeline(self, mock_github):
         """Test the full three-agent pipeline."""
         # Create agents
         profile_agent = ProfileAgent()
@@ -253,23 +245,15 @@ class TestAgentIntegration:
         resolution_agent = ResolutionAgent()
 
         # Mock the GitHub API calls
-        mock_repo_data = {"owner": "test", "name": "repo"}
-        mock_repo_info = {
-            "name": "repo",
-            "description": "Test repository",
-            "stars": 0,
-            "language": "Python",
-            "topics": []
-        }
-        
-        with patch.object(analysis_agent.github_helper, "parse_repo_url", return_value=mock_repo_data):
-            with patch.object(analysis_agent.github_helper, "get_repo_info", return_value=mock_repo_info):
-                with patch.object(analysis_agent.repo_parser, "parse_repository_files", return_value=[]):
-                    # Run analysis
-                    analysis = await analysis_agent.analyze("https://github.com/test/repo")
+        mock_repo = MagicMock()
+        mock_repo.get_contents.side_effect = GithubException(404, 'Not Found', {})
+        mock_github.return_value.get_repo.return_value = mock_repo
 
-                    # Generate resolution
-                    resolution = await resolution_agent.resolve(analysis, preferred_strategy="docker")
+        # Run analysis
+        analysis = await analysis_agent.analyze("https://github.com/test/repo")
 
-                    assert resolution is not None
-                    assert len(resolution.generated_files) > 0
+        # Generate resolution
+        resolution = resolution_agent.resolve(analysis, strategy="docker")
+
+        assert resolution is not None
+        assert len(resolution.generated_files) > 0

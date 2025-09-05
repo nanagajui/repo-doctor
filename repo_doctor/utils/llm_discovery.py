@@ -239,10 +239,11 @@ class LLMDiscovery:
         config_dir.mkdir(exist_ok=True)
         
         config_file = config_dir / "llm_config.json"
+        import time
         config_data = {
             "base_url": discovered_url,
             "server_info": server_info,
-            "discovered_at": asyncio.get_event_loop().time(),
+            "discovered_at": time.time(),
             "environment": self._get_environment_info()
         }
         

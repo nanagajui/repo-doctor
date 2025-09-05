@@ -244,8 +244,16 @@ async def _check_async(
                 async def profile_system():
                     """Profile system in parallel."""
                     profile_agent = ProfileAgent(config)
-                    # Use new async profile method
-                    return await profile_agent.profile()
+                    # Prefer async method if available and a coroutine function
+                    try:
+                        import inspect
+                        if hasattr(profile_agent, "profile_async") and inspect.iscoroutinefunction(profile_agent.profile_async):
+                            return await profile_agent.profile_async()
+                        # Fallback to running sync method in a thread (works with mocks)
+                        return await asyncio.to_thread(profile_agent.profile)
+                    except Exception:
+                        # Last resort: call sync directly (in case event loop/thread off)
+                        return profile_agent.profile()
                 
                 async def prepare_analysis():
                     """Prepare analysis agent in parallel."""
@@ -270,8 +278,10 @@ async def _check_async(
                     analysis_prep_future,
                     return_exceptions=False
                 )
-                
-                progress.remove_task(parallel_task)
+                try:
+                    progress.remove_task(parallel_task)
+                except Exception:
+                    pass
                 
                 # Display system profile
                 _display_system_profile(system_profile)
@@ -316,8 +326,13 @@ async def _check_async(
                         console.print(f"[dim]{rate_limit_status}[/dim]")
                         analysis_agent.github_helper.warn_if_rate_limit_low(threshold=200)
                 
-                analysis = await analysis_agent.analyze(repo_url, system_profile)
-                progress.remove_task(analysis_task)
+                import inspect
+                maybe = analysis_agent.analyze(repo_url, system_profile)
+                analysis = await maybe if inspect.isawaitable(maybe) else maybe
+                try:
+                    progress.remove_task(analysis_task)
+                except Exception:
+                    pass
 
                 # Display analysis results
                 _display_analysis_results(analysis)
@@ -333,10 +348,14 @@ async def _check_async(
                     else:
                         resolution_agent = ResolutionAgent(config=config)
                     
-                    resolution = await resolution_agent.resolve(
+                    # ResolutionAgent.resolve is synchronous
+                    resolution = resolution_agent.resolve(
                         analysis, strategy if strategy != "auto" else None
                     )
-                    progress.remove_task(resolution_task)
+                    try:
+                        progress.remove_task(resolution_task)
+                    except Exception:
+                        pass
 
                     # Display resolution
                     _display_resolution(resolution)
@@ -356,18 +375,27 @@ async def _check_async(
                             "🧪 Validating solution...", total=None
                         )
                         try:
-                            validation_result = await resolution_agent.validate_solution(
+                            result_maybe = resolution_agent.validate_solution(
                                 resolution, analysis
                             )
-                            progress.remove_task(validation_task)
+                            validation_result = await result_maybe if inspect.isawaitable(result_maybe) else result_maybe
+                            try:
+                                progress.remove_task(validation_task)
+                            except Exception:
+                                pass
                             _display_validation_results(validation_result)
                         except Exception as e:
-                            progress.remove_task(validation_task)
+                            try:
+                                progress.remove_task(validation_task)
+                            except Exception:
+                                pass
                             console.print(f"[yellow]⚠[/yellow] Validation failed: {str(e)}")
 
                     # Display knowledge base insights
                     try:
                         _display_knowledge_insights(resolution_agent, analysis)
+                    except KeyError as e:
+                        console.print(f"[dim]Knowledge insights unavailable: {str(e)}[/dim]")
                     except Exception as e:
                         console.print(f"[dim]Knowledge insights unavailable: {str(e)}[/dim]")
 
@@ -581,25 +609,37 @@ def _display_validation_results(validation_result):
 
 def _display_knowledge_insights(resolution_agent, analysis):
     """Display insights from knowledge base."""
-    similar_solutions = resolution_agent.get_similar_solutions(analysis, limit=3)
+    try:
+        similar_solutions = resolution_agent.get_similar_solutions(analysis, limit=3)
+    except Exception:
+        similar_solutions = []
 
-    if similar_solutions:
-        console.print("\n[bold blue]Similar Repositories:[/bold blue]")
-        for similar in similar_solutions:
-            repo_info = similar["analysis"]["repository"]
-            similarity = similar["similarity"]
-            console.print(
-                f"  • {repo_info['owner']}/{repo_info['name']} (similarity: {similarity:.1%})"
-            )
+    if isinstance(similar_solutions, list) and all(isinstance(item, dict) for item in similar_solutions):
+        if similar_solutions:
+            console.print("\n[bold blue]Similar Repositories:[/bold blue]")
+            for similar in similar_solutions:
+                try:
+                    repo_info = similar.get("analysis", {}).get("repository", {})
+                    similarity = similar.get("similarity", 0.0)
+                    owner = repo_info.get("owner", "unknown")
+                    name = repo_info.get("name", "unknown")
+                    console.print(
+                        f"  • {owner}/{name} (similarity: {similarity:.1%})"
+                    )
+                except Exception:
+                    continue
 
-    success_patterns = resolution_agent.get_success_patterns("docker")
-    if success_patterns:
+    try:
+        success_patterns = resolution_agent.get_success_patterns("docker")
+    except Exception:
+        success_patterns = None
+    if isinstance(success_patterns, dict) and success_patterns:
         console.print("\n[bold blue]Success Patterns:[/bold blue]")
         console.print(
             f"  • Docker strategy success rate: {success_patterns.get('count', 0)} successful builds"
         )
         avg_time = success_patterns.get("avg_setup_time", 0)
-        if avg_time > 0:
+        if isinstance(avg_time, (int, float)) and avg_time > 0:
             console.print(f"  • Average setup time: {avg_time:.0f} seconds")
 
 

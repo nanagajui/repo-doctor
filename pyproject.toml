@@ -57,7 +57,12 @@ dev = [
     "mypy>=1.0.0",
     "pytest>=8.0.0",
     "pytest-cov>=6.0.0",
+    "pytest-timeout>=2.2.0",
 ]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["repo_doctor*"]
 
 [project.scripts]
 repo-doctor = "repo_doctor.cli:main"
@@ -118,6 +123,8 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+timeout = 10
+timeout_method = "thread"
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
@@ -157,6 +164,6 @@ exclude_lines = [
     "raise NotImplementedError",
     "if 0:",
     "if __name__ == .__main__.:",
-    "class .*\\bProtocol\\):",
+    "class .*\\(\\bProtocol\\):",
     "@(abc\\.)?abstractmethod",
 ]
