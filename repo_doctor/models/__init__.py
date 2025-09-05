@@ -1,11 +1,17 @@
 """Data models for repo-doctor."""
 
-from .system import SystemProfile, HardwareInfo, SoftwareStack
-from .analysis import Analysis, RepositoryInfo, DependencyInfo
+from .analysis import Analysis, DependencyInfo, RepositoryInfo
 from .resolution import Resolution, Strategy, ValidationResult
+from .system import HardwareInfo, SoftwareStack, SystemProfile
 
 __all__ = [
-    "SystemProfile", "HardwareInfo", "SoftwareStack",
-    "Analysis", "RepositoryInfo", "DependencyInfo", 
-    "Resolution", "Strategy", "ValidationResult"
+    "SystemProfile",
+    "HardwareInfo",
+    "SoftwareStack",
+    "Analysis",
+    "RepositoryInfo",
+    "DependencyInfo",
+    "Resolution",
+    "Strategy",
+    "ValidationResult",
 ]

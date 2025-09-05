@@ -1,12 +1,14 @@
 """Resolution and strategy models."""
 
-from typing import Dict, List, Optional, Any
-from pydantic import BaseModel, Field
 from enum import Enum
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel, Field
 
 
 class StrategyType(str, Enum):
     """Types of resolution strategies."""
+
     DOCKER = "docker"
     CONDA = "conda"
     VENV = "venv"
@@ -15,6 +17,7 @@ class StrategyType(str, Enum):
 
 class ValidationStatus(str, Enum):
     """Validation status."""
+
     PENDING = "pending"
     RUNNING = "running"
     SUCCESS = "success"
@@ -24,6 +27,7 @@ class ValidationStatus(str, Enum):
 
 class GeneratedFile(BaseModel):
     """Generated file information."""
+
     path: str
     content: str
     description: str
@@ -32,6 +36,7 @@ class GeneratedFile(BaseModel):
 
 class ValidationResult(BaseModel):
     """Result of solution validation."""
+
     status: ValidationStatus
     duration: float = 0.0
     logs: List[str] = Field(default_factory=list)
@@ -41,6 +46,7 @@ class ValidationResult(BaseModel):
 
 class Strategy(BaseModel):
     """Resolution strategy configuration."""
+
     type: StrategyType
     priority: int = 0
     requirements: Dict[str, Any] = Field(default_factory=dict)
@@ -50,18 +56,21 @@ class Strategy(BaseModel):
 
 class Resolution(BaseModel):
     """Complete resolution with generated artifacts."""
+
     strategy: Strategy
     generated_files: List[GeneratedFile] = Field(default_factory=list)
     setup_commands: List[str] = Field(default_factory=list)
     validation_result: Optional[ValidationResult] = None
     instructions: str = ""
     estimated_size_mb: int = 0
-    
+
     def is_validated(self) -> bool:
         """Check if resolution has been validated."""
-        return (self.validation_result is not None and 
-                self.validation_result.status == ValidationStatus.SUCCESS)
-    
+        return (
+            self.validation_result is not None
+            and self.validation_result.status == ValidationStatus.SUCCESS
+        )
+
     def get_file_by_name(self, filename: str) -> Optional[GeneratedFile]:
         """Get generated file by name."""
         for file in self.generated_files:

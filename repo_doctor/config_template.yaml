@@ -1,0 +1,40 @@
+# Repo Doctor Configuration (Simplified)
+# This is the minimal configuration file - all values have smart defaults
+
+# Basic configuration (most users only need this)
+strategy: auto  # auto, docker, conda, venv
+
+# To use a preset, uncomment one of these:
+# preset: ml-research    # Conda + flexible GPU for research
+# preset: production     # Docker + strict validation
+# preset: development    # Venv + CPU fallback for local dev
+# preset: quick         # Fastest analysis, no validation
+
+# ============================================
+# Advanced settings (optional - hidden by default)
+# ============================================
+# Uncomment sections below only if you need to customize
+
+# advanced:
+#   gpu_mode: flexible        # strict, flexible, cpu_fallback
+#   validation: true          # Enable/disable solution validation
+#   cache_ttl: 3600          # Cache time-to-live in seconds
+#   container_timeout: 300    # Container operations timeout (seconds)
+#   profile_agent_timeout: 2.0   # Profile agent performance timeout
+#   analysis_agent_timeout: 10.0 # Analysis agent performance timeout
+#   resolution_agent_timeout: 5.0 # Resolution agent performance timeout
+#   gpu_detection_timeout: 10    # GPU detection command timeout
+#   version_check_timeout: 5     # Version check command timeout
+#   default_python_version: "3.10" # Default Python version for environments
+#   
+# # LLM Integration (optional)
+# llm:
+#   enabled: false
+#   # base_url: http://localhost:1234/v1
+#   # model: qwen/qwen3-4b-thinking-2507
+#   
+# # Performance tuning (optional)
+# performance:
+#   parallel_agents: true     # Run agents in parallel
+#   cache_enabled: true      # Enable GitHub API caching
+#   max_analysis_time: 10    # Maximum seconds for analysis

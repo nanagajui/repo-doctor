@@ -1,0 +1,6 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+Always check IMPLEMENTATION_PLAN.md to understand the project before making any changes.
