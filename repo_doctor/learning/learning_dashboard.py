@@ -169,6 +169,9 @@ class LearningDashboard:
         try:
             recommendations = []
             metrics = self.get_dashboard_metrics()
+            # For a fresh knowledge base with no data, return no recommendations
+            if metrics.total_analyses == 0 and metrics.pattern_count == 0:
+                return []
             
             # Success rate recommendations
             if metrics.success_rate < 0.7:

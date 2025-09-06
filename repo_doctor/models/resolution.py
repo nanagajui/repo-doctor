@@ -64,6 +64,11 @@ class Resolution(BaseModel):
     validation_result: Optional[ValidationResult] = None
     instructions: str = ""
     estimated_size_mb: int = 0
+    # ML-enhanced fields (used by EnhancedResolutionAgent)
+    insights: List[Dict[str, Any]] = Field(default_factory=list)
+    confidence_score: float = 0.0
+    learning_confidence: Optional[float] = None
+    ml_recommendations: Optional[List[Dict[str, Any]]] = None
 
     def is_validated(self) -> bool:
         """Check if resolution has been validated."""

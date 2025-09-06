@@ -265,6 +265,10 @@ class SmartLLMConfig:
     
     async def get_config(self, force_refresh: bool = False) -> Dict[str, Any]:
         """Get smart LLM configuration."""
+        # If disabled via environment, bypass discovery entirely
+        if os.getenv("REPO_DOCTOR_DISABLE_LLM", "0") in ("1", "true", "TRUE", "yes", "YES"):
+            return self.get_fallback_config()
+
         current_time = asyncio.get_event_loop().time()
         
         # Use cached config if still valid

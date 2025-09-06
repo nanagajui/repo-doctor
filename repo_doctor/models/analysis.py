@@ -20,7 +20,7 @@ class DependencyInfo(BaseModel):
 
     name: str
     version: Optional[str] = None
-    type: DependencyType
+    type: DependencyType = DependencyType.PYTHON
     source: str  # requirements.txt, setup.py, etc.
     optional: bool = False
     gpu_required: bool = False

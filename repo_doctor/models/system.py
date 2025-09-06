@@ -42,7 +42,7 @@ class SystemProfile(BaseModel):
 
     hardware: HardwareInfo
     software: SoftwareStack
-    platform: str  # linux, darwin, win32
+    platform: str = Field(default="linux")  # linux, darwin, win32
     container_runtime: Optional[str] = None  # docker, podman, none
     compute_score: float = Field(
         default=0.0, description="Overall compute capability score"

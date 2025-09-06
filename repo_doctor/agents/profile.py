@@ -1,7 +1,9 @@
 """Profile Agent - System profiling and capability detection."""
 
 import asyncio
+import os
 import platform
+import shutil
 import subprocess
 import time
 from typing import List, Optional, Dict, Any
@@ -21,6 +23,8 @@ class ProfileAgent:
         self.config = config or Config.load()
         self.performance_monitor = AgentPerformanceMonitor(self.config)
         self.logger = get_logger(__name__)
+        # Enable a fast profile mode for tests/CI to avoid long-running commands
+        self._fast_profile = os.getenv("REPO_DOCTOR_FAST_PROFILE", "0") in {"1", "true", "True"}
 
     def profile(self) -> SystemProfile:
         """Generate complete system profile with contract validation (sync).
@@ -113,15 +117,38 @@ class ProfileAgent:
             python_version = platform.python_version()
         except Exception:
             python_version = "unknown"
-            
+        
+        # In fast mode, avoid ALL external subprocess calls to prevent timeouts in CI/tests
+        if self._fast_profile:
+            return SoftwareStack(
+                python_version=python_version,
+                pip_version=None,
+                conda_version=None,
+                micromamba_version=None,
+                docker_version=None,
+                git_version=None,
+                cuda_version=None,
+            )
+
+        # Use a conservative timeout for version checks derived from config
+        cmd_timeout = self._effective_cmd_timeout()
+
+        pip_version = self._run_command(["pip", "--version"], timeout=cmd_timeout)
+        git_version = self._run_command(["git", "--version"], timeout=cmd_timeout)
+
+        conda_version = self._run_command(["conda", "--version"], timeout=cmd_timeout)
+        micromamba_version = self._run_command(["micromamba", "--version"], timeout=cmd_timeout)
+        docker_version = self._run_command(["docker", "--version"], timeout=cmd_timeout)
+        cuda_version = self._detect_cuda_version()
+
         return SoftwareStack(
             python_version=python_version,
-            pip_version=self._run_command(["pip", "--version"]),
-            conda_version=self._run_command(["conda", "--version"]),
-            micromamba_version=self._run_command(["micromamba", "--version"]),
-            docker_version=self._run_command(["docker", "--version"]),
-            git_version=self._run_command(["git", "--version"]),
-            cuda_version=self._detect_cuda_version(),
+            pip_version=pip_version,
+            conda_version=conda_version,
+            micromamba_version=micromamba_version,
+            docker_version=docker_version,
+            git_version=git_version,
+            cuda_version=cuda_version,
         )
 
     def _detect_gpus(self) -> List[GPUInfo]:
@@ -195,10 +222,18 @@ class ProfileAgent:
 
     def _detect_container_runtime(self) -> Optional[str]:
         """Detect available container runtime."""
+        # In fast profile mode, skip container runtime probing entirely
+        if self._fast_profile:
+            return None
+
+        eff_timeout = self._effective_cmd_timeout()
         for runtime in ["docker", "podman"]:
+            # Skip if binary not present
+            if shutil.which(runtime) is None:
+                continue
             try:
                 result = subprocess.run(
-                    [runtime, "--version"], capture_output=True, text=True, timeout=self.config.advanced.version_check_timeout
+                    [runtime, "--version"], capture_output=True, text=True, timeout=eff_timeout
                 )
                 if result.returncode == 0:
                     return runtime
@@ -210,11 +245,26 @@ class ProfileAgent:
                 continue
         return None
 
-    def _run_command(self, command: List[str], timeout: int = 5) -> Optional[str]:
-        """Get version from command output."""
+    def _run_command(self, command: List[str], timeout: Optional[int] = None) -> Optional[str]:
+        """Get version from command output with safety guards.
+
+        - Respects configured timeouts
+        - Skips invocation if binary not present
+        - Extracts semantic version when possible
+        """
+        # Skip if the executable is not available to avoid spawn errors or hangs
+        if not command or shutil.which(command[0]) is None:
+            return None
+
+        # Determine timeout: prefer provided, else config-derived
+        eff_timeout = timeout if timeout is not None else self._effective_cmd_timeout()
+
         try:
             result = subprocess.run(
-                command, capture_output=True, text=True, timeout=timeout
+                command,
+                capture_output=True,
+                text=True,
+                timeout=eff_timeout,
             )
             if result.returncode == 0:
                 # Extract version number from output
@@ -233,6 +283,23 @@ class ProfileAgent:
         ):
             pass
         return None
+
+    def _effective_cmd_timeout(self) -> int:
+        """Compute a conservative timeout for version commands.
+
+        Uses the lower of version_check_timeout and profile_agent_timeout (rounded),
+        with a minimum of 1 second to avoid zero timeouts.
+        """
+        try:
+            # profile_agent_timeout is a float (performance target), use it as an upper bound
+            perf_cap = max(1, int(self.performance_monitor.performance_targets.get("profile_agent", 2)))
+        except Exception:
+            perf_cap = 2
+
+        # Configured version check timeout
+        cfg_timeout = getattr(self.config.advanced, "version_check_timeout", 5)
+
+        return max(1, min(perf_cap, int(cfg_timeout)))
 
     def _calculate_compute_score(self) -> float:
         """Calculate overall compute capability score."""

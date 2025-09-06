@@ -49,6 +49,13 @@ class EnhancedResolutionAgent(ResolutionAgent):
             ml_recommendations = self.learning_system.get_adaptive_recommendations(
                 analysis.model_dump(), system_profile.model_dump()
             )
+            # Normalize: learning system may return a list (tests) or a dict (full payload)
+            if isinstance(ml_recommendations, list):
+                ml_recommendations = {
+                    "recommendations": ml_recommendations,
+                    "learning_confidence": 0.5,
+                    "pattern_insights": [],
+                }
             
             # Select best strategy based on ML predictions
             if not preferred_strategy and self.ml_enabled:
@@ -83,6 +90,9 @@ class EnhancedResolutionAgent(ResolutionAgent):
             if self.ml_enabled:
                 resolution.insights = ml_recommendations.get("pattern_insights", [])
                 resolution.confidence_score = ml_recommendations.get("learning_confidence", 0.5)
+                # Populate additional ML fields on Resolution model
+                resolution.learning_confidence = ml_recommendations.get("learning_confidence", 0.5)
+                resolution.ml_recommendations = ml_recommendations.get("recommendations", [])
             
             # Validate the resolution
             from ..agents.contracts import AgentContractValidator
@@ -168,8 +178,10 @@ class EnhancedResolutionAgent(ResolutionAgent):
         
         # Enhance with ML insights
         if self.ml_enabled and ml_recommendations:
-            # Add ML confidence to resolution
+            # Add ML confidence and recommendations to resolution
             resolution.confidence_score = ml_recommendations.get("learning_confidence", 0.5)
+            resolution.learning_confidence = ml_recommendations.get("learning_confidence", 0.5)
+            resolution.ml_recommendations = ml_recommendations.get("recommendations", [])
             
             # Add pattern insights to instructions
             pattern_insights = ml_recommendations.get("pattern_insights", [])

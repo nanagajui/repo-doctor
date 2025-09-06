@@ -2,6 +2,7 @@
 
 from typing import Dict, List, Optional, Any, Tuple
 import json
+import time
 from pathlib import Path
 
 from ..knowledge.base import KnowledgeBase
@@ -31,6 +32,10 @@ class MLKnowledgeBase(KnowledgeBase):
         self.learning_enabled = True
         self.pattern_cache = {}
         self.last_pattern_update = 0
+        # Components expected by tests and other modules
+        self.pattern_engine = PatternDiscoveryEngine(self)
+        from .adaptive_learning import AdaptiveLearningSystem
+        self.learning_system = AdaptiveLearningSystem(self)
 
     def record_ml_analysis(self, analysis: Analysis, resolution: Resolution, 
                           outcome: ValidationResult, system_profile: SystemProfile) -> str:
