@@ -17,7 +17,7 @@ from .pattern_discovery import PatternDiscoveryEngine
 class EnhancedAnalysisAgent(AnalysisAgent):
     """Analysis agent with ML-enhanced learning capabilities."""
 
-    def __init__(self, github_token: Optional[str] = None, config: Optional[Config] = None, 
+    def __init__(self, config: Optional[Config] = None, github_token: Optional[str] = None, 
                  use_cache: bool = True, knowledge_base_path: Optional[str] = None):
         """Initialize enhanced analysis agent."""
         super().__init__(config=config, github_token=github_token, use_cache=use_cache)

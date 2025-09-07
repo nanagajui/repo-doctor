@@ -44,7 +44,7 @@ class AnalysisAgent:
         self.logger = get_logger(__name__)
         self.config = config or Config()
         # Use EnvLoader if no token provided
-        token = github_token or self.config.integrations.github_token or EnvLoader.get_github_token()
+        token = github_token or EnvLoader.get_github_token()
         # Determine offline mode: ONLY respect explicit REPO_DOCTOR_OFFLINE flag.
         # Do NOT force offline when token is missing; allow unauthenticated requests.
         import os as _os

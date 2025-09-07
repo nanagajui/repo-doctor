@@ -348,10 +348,12 @@ async def _check_async(
                     else:
                         resolution_agent = ResolutionAgent(config=config)
                     
-                    # ResolutionAgent.resolve is synchronous
-                    resolution = resolution_agent.resolve(
+                    # Handle both sync and async resolve methods
+                    import inspect
+                    maybe_resolution = resolution_agent.resolve(
                         analysis, strategy if strategy != "auto" else None
                     )
+                    resolution = await maybe_resolution if inspect.isawaitable(maybe_resolution) else maybe_resolution
                     try:
                         progress.remove_task(resolution_task)
                     except Exception:
