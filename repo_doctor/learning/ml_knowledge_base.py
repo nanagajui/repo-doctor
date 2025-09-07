@@ -223,9 +223,9 @@ class MLKnowledgeBase(KnowledgeBase):
             
             # Update patterns based on outcome
             if outcome.status.value == "success":
-                self._update_success_patterns(patterns, analysis, resolution)
+                self._update_success_patterns_ml(patterns, analysis, resolution)
             else:
-                self._update_failure_patterns(patterns, analysis, resolution, outcome)
+                self._update_failure_patterns_ml(patterns, analysis, resolution, outcome)
             
             # Store updated patterns
             self.ml_storage.store_patterns(patterns)
@@ -234,7 +234,7 @@ class MLKnowledgeBase(KnowledgeBase):
         except Exception as e:
             print(f"Error updating learning patterns: {e}")
 
-    def _update_success_patterns(self, patterns: Dict[str, Any], analysis: Analysis, resolution: Resolution):
+    def _update_success_patterns_ml(self, patterns: Dict[str, Any], analysis: Analysis, resolution: Resolution):
         """Update successful resolution patterns."""
         if "successful" not in patterns:
             patterns["successful"] = {}
@@ -274,7 +274,7 @@ class MLKnowledgeBase(KnowledgeBase):
                 gpu_successes / patterns["successful"][strategy_type]["count"]
             )
 
-    def _update_failure_patterns(self, patterns: Dict[str, Any], analysis: Analysis, 
+    def _update_failure_patterns_ml(self, patterns: Dict[str, Any], analysis: Analysis, 
                                 resolution: Resolution, outcome: ValidationResult):
         """Update failure patterns."""
         if "failed" not in patterns:

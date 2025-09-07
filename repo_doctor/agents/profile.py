@@ -27,10 +27,11 @@ class ProfileAgent:
         self._fast_profile = os.getenv("REPO_DOCTOR_FAST_PROFILE", "0") in {"1", "true", "True"}
 
     def profile(self) -> SystemProfile:
-        """Generate complete system profile with contract validation (sync).
+        """Generate complete system profile with dual sync/async compatibility.
 
-        This synchronous interface is required by tests and CLI contexts.
-        For async usage, use `profile_async`.
+        Returns an object that:
+        - behaves like `SystemProfile` for synchronous usage (attribute access forwards), and
+        - is awaitable; `await agent.profile()` resolves to the same `SystemProfile`.
         """
         start_time = time.time()
 
@@ -51,7 +52,14 @@ class ProfileAgent:
             # Log performance metrics
             log_performance("system_profile", duration, agent="ProfileAgent")
 
-            return profile
+            # Return an awaitable SystemProfile subclass for compatibility
+            class _AwaitableSystemProfile(SystemProfile):
+                def __await__(self):
+                    async def _coro():
+                        return self
+                    return _coro().__await__()
+
+            return _AwaitableSystemProfile(**profile.model_dump())  # type: ignore[return-value]
         except Exception as e:
             return AgentErrorHandler.handle_profile_error(e, "system_profiling")
 

@@ -31,20 +31,30 @@ def pytest_pyfunc_call(pyfuncitem: pytest.Function) -> bool | None:
     return True to indicate the call was handled.
     """
     testfunction = pyfuncitem.obj
-    if inspect.iscoroutinefunction(testfunction):
-        # Run coroutine tests and pass only fixtures explicitly declared
-        sig = inspect.signature(testfunction)
-        accepted = {k: v for k, v in pyfuncitem.funcargs.items() if k in sig.parameters}
-        asyncio.run(testfunction(**accepted))
-        return True
-    return None
+    if not inspect.iscoroutinefunction(testfunction):
+        return None
+
+    # If an event loop is already running (e.g., provided by a plugin), do not intercept
+    try:
+        asyncio.get_running_loop()
+        return None
+    except RuntimeError:
+        pass
+
+    # Run coroutine tests ourselves and pass only declared fixtures
+    sig = inspect.signature(testfunction)
+    accepted = {k: v for k, v in pyfuncitem.funcargs.items() if k in sig.parameters}
+    asyncio.run(testfunction(**accepted))
+    return True
 
 
 # Ensure environment is predictable for tests that rely on these variables
 @pytest.fixture(autouse=True)
 def _normalize_env(monkeypatch: pytest.MonkeyPatch):
-    # Configure LLM server for WSL-hosted LM Studio on Windows
-    monkeypatch.setenv("LLM_BASE_URL", "http://172.29.96.1:1234/v1")
+    # Configure LLM server URL only if not already set; prefer localhost by default
+    current_llm = os.getenv("LLM_BASE_URL")
+    if not current_llm:
+        monkeypatch.setenv("LLM_BASE_URL", "http://172.29.96.1:1234/v1")
     # Clear API key unless explicitly required
     monkeypatch.delenv("LLM_API_KEY", raising=False)
     yield

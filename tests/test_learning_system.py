@@ -21,7 +21,7 @@ from repo_doctor.learning import (
     LearningDashboard
 )
 from repo_doctor.models.analysis import Analysis, RepositoryInfo, DependencyInfo
-from repo_doctor.models.resolution import Resolution, Strategy, StrategyType, ValidationResult, ValidationStatus
+from repo_doctor.models.resolution import Resolution, Strategy, StrategyType, ValidationResult, ValidationStatus, GeneratedFile
 from repo_doctor.models.system import SystemProfile, HardwareInfo, SoftwareStack, GPUInfo
 
 
@@ -139,16 +139,18 @@ def create_sample_resolution() -> Resolution:
     
     # Create generated files
     generated_files = [
-        {
-            "name": "Dockerfile",
-            "content": "FROM nvidia/cuda:11.8-devel-ubuntu20.04\n...",
-            "path": "./Dockerfile"
-        },
-        {
-            "name": "docker-compose.yml",
-            "content": "version: '3.8'\nservices:\n  app:\n...",
-            "path": "./docker-compose.yml"
-        }
+        GeneratedFile(
+            path="./Dockerfile",
+            content="FROM nvidia/cuda:11.8-devel-ubuntu20.04\n...",
+            description="Dockerfile for GPU-enabled environment",
+            executable=False,
+        ),
+        GeneratedFile(
+            path="./docker-compose.yml",
+            content="version: '3.8'\nservices:\n  app:\n...",
+            description="Docker Compose configuration",
+            executable=False,
+        ),
     ]
     
     # Create resolution

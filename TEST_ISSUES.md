@@ -1,25 +1,49 @@
+### analysis_agent_github_content_timeout
+```json
+{
+  "status": "FAILED",
+  "file": "tests/test_integration.py (or related)",
+  "class": "<n/a>",
+  "error_type": "TimeoutError",
+  "error_message": "requests/urllib3 timeout while calling GitHub API in AnalysisAgent._get_file_content",
+  "root_cause": "Live network call to GitHub via PyGithub.get_contents during README scan with no token/offline conditions.",
+  "required_fix": "Introduce an offline-safe path in AnalysisAgent: short-circuit remote content fetch when no token or when an OFFLINE flag/config is set; add small request timeout and robust exception handling."
+}
+```
+
 # TEST_ISSUES.md - Machine Readable Test Status
 
 ## METADATA
-- **Last Updated**: 2025-09-06T12:44:40+09:30
+- **Last Updated**: 2025-09-06T20:19:28+09:30
 - **Test Environment**: Python 3.12.3
-- **Test Command**: `pytest --tb=short -v --durations=10 --ignore=tests/test_learning_system.py --ignore=tests/test_real_repositories.py --ignore=tests/test_llm_with_repos.py`
+- **Test Command**: `pytest -q --maxfail=50 --disable-warnings --durations=10`
 
 ## TEST_SUMMARY
 ```json
 {
-  "total_tests": 258,
-  "passed": 256,
-  "failed": 2,
-  "error": 0,
-  "skipped": 0,
-  "total_coverage": 45.0,
-  "test_files": ["<multiple>"],
-  "ignored_tests": [
-    "tests/test_learning_system.py",
-    "tests/test_real_repositories.py",
-    "tests/test_llm_with_repos.py"
-  ]
+  "notes": "Latest focused runs validated LLM suites against live server. Full suite run surfaced a remaining network timeout in AnalysisAgent when parsing GitHub contents.",
+  "llm_suites": {
+    "files": [
+      "tests/test_llm_comprehensive.py",
+      "tests/test_llm_edge_cases.py",
+      "tests/test_llm_focused.py",
+      "tests/test_llm_integration.py",
+      "tests/test_llm_with_repos.py",
+      "tests/test_smart_llm_discovery.py"
+    ],
+    "status": "passed"
+  },
+  "full_run_summary": {
+    "passed": "majority",
+    "failed": 1,
+    "errors": 0,
+    "failures": [
+      {
+        "file": "tests/test_integration.py (or related)",
+        "note": "Network timeout in AnalysisAgent._get_file_content via PyGithub during documentation scan"
+      }
+    ]
+  }
 }
 ```
 
@@ -141,6 +165,14 @@
     "issue": "LLM-backed documentation analysis test hangs without reachable LLM server",
     "suggested_fix": "Mock LLM client responses or gate behind a marker (e.g., @pytest.mark.llm) and skip by default"
   }
+  ,
+  {
+    "test_file": "tests/test_integration.py (or related)",
+    "test_function": "<multiple>",
+    "location": "agents/analysis.py::_get_file_content",
+    "issue": "Network call to GitHub via PyGithub.get_contents leads to timeout in full test run",
+    "suggested_fix": "Add offline guard (e.g., REPO_DOCTOR_OFFLINE=1) and/or require a token for GitHub fetch, apply short per-request timeout and catch exceptions to continue gracefully"
+  }
 ]
 ```
 
@@ -201,79 +233,96 @@
     "related_issue": "TIMEOUT_ISSUES[0]",
     "status": "completed"
   }
+  ,
+  {
+    "date": "2025-09-06T20:05:00+09:30",
+    "component": "Learning/FeatureExtractor",
+    "file": "repo_doctor/learning/feature_extractor.py",
+    "change": "Hardened GPU vendor detection and resolution file introspection; robust outcome parsing",
+    "details": {
+      "gpu_vendor": "derive from name if vendor missing",
+      "files": "use name or path basename",
+      "outcome": "handle enums/strings"
+    },
+    "related_issue": "tests/test_learning_system.py::test_feature_extraction",
+    "status": "completed"
+  },
+  {
+    "date": "2025-09-06T20:06:00+09:30",
+    "component": "Learning/MLKnowledgeBase",
+    "file": "repo_doctor/learning/ml_knowledge_base.py",
+    "change": "Avoided base-class method override mismatch by renaming ML-specific pattern updaters",
+    "details": {
+      "methods": ["_update_success_patterns_ml", "_update_failure_patterns_ml"],
+      "call_site": "_update_learning_patterns"
+    },
+    "related_issue": "tests/test_learning_system.py::test_ml_knowledge_base",
+    "status": "completed"
+  },
+  {
+    "date": "2025-09-06T20:08:00+09:30",
+    "component": "Tests/Async Harness",
+    "file": "tests/conftest.py",
+    "change": "Async test runner now uses asyncio.run unless an event loop is already present; LLM base URL defaults to user's live server when unset",
+    "details": {
+      "pytest_pyfunc_call": "cooperates with pytest-asyncio and avoids event loop conflicts",
+      "LLM_BASE_URL": "http://172.29.96.1:1234/v1 if unset"
+    },
+    "related_issue": "async def tests not supported / LLM hangs",
+    "status": "completed"
+  },
+  {
+    "date": "2025-09-06T20:12:00+09:30",
+    "component": "LLM Integration",
+    "file": "repo_doctor/utils/llm.py",
+    "change": "Stabilized LLM client and analyzer for live server + mocks (timeouts, JSON parsing, wait_for caps)",
+    "details": {
+      "client": "restored constructor defaults; availability fallbacks; tolerant JSON parsing; ClientTimeout",
+      "analyzer": "asyncio.wait_for caps and TimeoutError handling"
+    },
+    "related_issue": "LLM suites",
+    "status": "completed"
+  }
 ]
 ```
 
 ## RECOMMENDED_ACTIONS
 1. **High Priority**:
-   - Fix Mock configurations in test_learning_integration.py
-   - Address timeout in test_learning_system.py
-   - Increase test coverage for CLI components
-   - Add pytest markers for network/LLM dependent tests and skip by default in CI
-   - Mock external dependencies (PyGithub, LLM HTTP client) in integration tests to avoid timeouts
+   - Introduce offline guard in `AnalysisAgent._get_file_content` to avoid GitHub calls during tests (e.g., respect `REPO_DOCTOR_OFFLINE=1` or require `github_token`) and set a strict request timeout.
+   - Keep LLM tests green by preserving tolerant JSON parsing and timeouts.
+   - Re-run full suite to confirm no further network timeouts.
 
 2. **Medium Priority**:
-   - Update test assertions to match current behavior
-   - Add proper error handling for Mock object operations
-   - Implement test timeouts for system commands
+   - Improve CLI coverage and error handling paths.
+   - Harden learning components for minimal data scenarios.
 
 3. **Low Priority**:
-   - Review and update test documentation
-   - Add integration tests for critical paths
-   - Implement test retries for flaky tests
+   - Review test documentation and add integration tests for critical paths.
+   - Consider test retries for transient network cases (outside offline mode).
 
 ---
 
 ## LATEST_RUN_SUMMARY
 ```json
 {
-  "timestamp": "2025-09-06T14:23:23+09:30",
+  "timestamp": "2025-09-06T20:19:28+09:30",
   "env": {
-    "REPO_DOCTOR_FAST_PROFILE": "1",
-    "REPO_DOCTOR_DISABLE_LLM": "1"
+    "LLM_BASE_URL": "http://172.29.96.1:1234/v1"
   },
-  "command": "pytest -q --ignore=tests/test_llm_comprehensive.py --ignore=tests/test_llm_edge_cases.py --ignore=tests/test_llm_focused.py --ignore=tests/test_llm_integration.py --ignore=tests/test_llm_with_repos.py --ignore=tests/test_real_repositories.py",
-  "result": {
-    "passed": 127,
-    "failed": 5,
-    "errors": 0,
-    "warnings": 11,
-    "coverage_overall": 44.0
+  "llm_run": {
+    "command": "pytest -q tests/test_llm_comprehensive.py tests/test_llm_edge_cases.py tests/test_llm_focused.py tests/test_llm_integration.py tests/test_llm_with_repos.py tests/test_smart_llm_discovery.py",
+    "result": { "passed": true }
   },
-  "remaining_failures": [
-    {
-      "file": "tests/test_learning_system.py",
-      "test": "test_feature_extraction",
-      "note": "Learning components path; validates repository/system/resolution/learning feature extraction"
-    },
-    {
-      "file": "tests/test_learning_system.py",
-      "test": "test_ml_knowledge_base",
-      "note": "Knowledge base record/recommendations/insights/metrics"
-    },
-    {
-      "file": "tests/test_learning_system.py",
-      "test": "test_strategy_predictor",
-      "note": "StrategySuccessPredictor training and recommendations"
-    },
-    {
-      "file": "tests/test_learning_system.py",
-      "test": "test_pattern_discovery",
-      "note": "PatternDiscoveryEngine discover and summarize"
-    },
-    {
-      "file": "tests/test_learning_system.py",
-      "test": "test_learning_dashboard",
-      "note": "LearningDashboard metrics/insights/patterns/status/recommendations"
+  "full_run": {
+    "command": "pytest -q --maxfail=50 --disable-warnings --durations=10",
+    "result": {
+      "failures": [
+        {
+          "file": "<integration tests>",
+          "root_cause": "GitHub content fetch timeout via PyGithub in AnalysisAgent"
+        }
+      ]
     }
-  ],
-  "recently_fixed": [
-    {
-      "file": "tests/test_learning_system.py",
-      "test": "test_enhanced_agents",
-      "status": "passed",
-      "fix": "Normalized ML recommendation payloads; added model defaults and fast-profile safeguards"
-    }
-  ]
+  }
 }
 ```

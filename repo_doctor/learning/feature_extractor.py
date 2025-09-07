@@ -105,8 +105,17 @@ class FeatureExtractor:
             "python_version": self._extract_python_version(profile.software.python_version),
             "container_runtime": profile.container_runtime,
             "compute_score": profile.compute_score,
-            "has_nvidia_gpu": any(gpu.vendor == "nvidia" for gpu in profile.hardware.gpus),
-            "has_amd_gpu": any(gpu.vendor == "amd" for gpu in profile.hardware.gpus),
+            # Robust vendor detection: some models may not have 'vendor' field
+            "has_nvidia_gpu": any(
+                (getattr(gpu, "vendor", None) or "").lower() == "nvidia"
+                or "nvidia" in (getattr(gpu, "name", "") or "").lower()
+                for gpu in profile.hardware.gpus
+            ),
+            "has_amd_gpu": any(
+                (getattr(gpu, "vendor", None) or "").lower() == "amd"
+                or any(k in (getattr(gpu, "name", "") or "").lower() for k in ["amd", "radeon", "rx", "vega"])
+                for gpu in profile.hardware.gpus
+            ),
         }
 
     def extract_resolution_features(self, resolution: Resolution) -> Dict[str, Any]:
@@ -126,8 +135,16 @@ class FeatureExtractor:
     def extract_learning_features(self, analysis: Analysis, resolution: Resolution, 
                                 outcome: Any) -> Dict[str, Any]:
         """Extract features for learning and pattern recognition."""
+        status_attr = getattr(outcome, 'status', None)
+        if hasattr(status_attr, 'value'):
+            success = str(getattr(status_attr, 'value')).lower() == 'success'
+        elif isinstance(status_attr, str):
+            success = status_attr.lower() == 'success'
+        else:
+            success = False
+
         return {
-            "success": getattr(outcome, 'status', {}).get('value') == 'success' if hasattr(outcome, 'status') else False,
+            "success": success,
             "duration": getattr(outcome, 'duration', 0) if hasattr(outcome, 'duration') else 0,
             "error_type": self._categorize_error(getattr(outcome, 'error_message', '')),
             "confidence_score": analysis.confidence_score,
@@ -248,7 +265,16 @@ class FeatureExtractor:
     def _extract_docker_base_image(self, resolution: Resolution) -> str:
         """Extract Docker base image type."""
         for file in resolution.generated_files:
-            if file.name == "Dockerfile" and hasattr(file, 'content'):
+            # Determine filename robustly from either 'name' or 'path'
+            filename = getattr(file, "name", None)
+            if filename is None:
+                filename = getattr(file, "path", "")
+                # Extract the basename if a path is provided
+                if "/" in filename or "\\" in filename:
+                    import os
+                    filename = os.path.basename(filename)
+
+            if filename == "Dockerfile" and hasattr(file, 'content'):
                 content = file.content
                 if "nvidia/cuda" in content:
                     return "nvidia_cuda"
@@ -261,7 +287,14 @@ class FeatureExtractor:
     def _has_gpu_support(self, resolution: Resolution) -> bool:
         """Check if resolution has GPU support."""
         for file in resolution.generated_files:
-            if file.name == "docker-compose.yml" and hasattr(file, 'content'):
+            filename = getattr(file, "name", None)
+            if filename is None:
+                filename = getattr(file, "path", "")
+                if "/" in filename or "\\" in filename:
+                    import os
+                    filename = os.path.basename(filename)
+
+            if filename == "docker-compose.yml" and hasattr(file, 'content'):
                 content = file.content
                 if "gpus" in content or "nvidia" in content:
                     return True
