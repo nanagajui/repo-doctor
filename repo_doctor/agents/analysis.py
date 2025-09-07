@@ -45,12 +45,14 @@ class AnalysisAgent:
         self.config = config or Config()
         # Use EnvLoader if no token provided
         token = github_token or self.config.integrations.github_token or EnvLoader.get_github_token()
-        # Determine offline mode: respect REPO_DOCTOR_OFFLINE or missing token
+        # Determine offline mode: ONLY respect explicit REPO_DOCTOR_OFFLINE flag.
+        # Do NOT force offline when token is missing; allow unauthenticated requests.
         import os as _os
-        self.offline = bool(_os.getenv("REPO_DOCTOR_OFFLINE")) or not bool(token)
+        self.offline = bool(_os.getenv("REPO_DOCTOR_OFFLINE"))
         # Configure a conservative GitHub client timeout to avoid hangs
         # PyGithub supports a 'timeout' argument for underlying requests
-        self.github = Github(token, timeout=5) if token else Github(timeout=5)
+        gh_timeout = self._github_request_timeout()
+        self.github = Github(token, timeout=gh_timeout) if token else Github(timeout=gh_timeout)
         self.github_helper = GitHubHelper(token)
         
         # Wrap with cache if enabled (STREAM B optimization)
@@ -76,6 +78,20 @@ class AnalysisAgent:
         
         # Initialize contract validation
         self.performance_monitor = AgentPerformanceMonitor()
+
+    def _github_request_timeout(self) -> int:
+        """Return per-request timeout (seconds) for GitHub API calls.
+
+        Reads REPO_DOCTOR_GITHUB_TIMEOUT from the environment, defaulting to 5s.
+        Caps to a reasonable minimum/maximum to avoid extremes in tests.
+        """
+        import os as _os
+        try:
+            val = int(_os.getenv("REPO_DOCTOR_GITHUB_TIMEOUT", "5"))
+        except ValueError:
+            val = 5
+        # Clamp between 2 and 30 seconds
+        return max(2, min(val, 30))
 
     async def analyze(self, repo_url: str, system_profile: Optional[SystemProfile] = None) -> Analysis:
         """Analyze repository for compatibility issues with contract validation."""
@@ -673,15 +689,40 @@ class AnalysisAgent:
     async def _get_file_content(
         self, owner: str, name: str, filename: str
     ) -> Optional[str]:
-        """Get file content from GitHub repository.
+        """Get file content from GitHub repository with timeouts and robust handling.
 
-        Offline-safe: if offline mode is enabled or network is unavailable, skip fetch.
+        - Respects explicit offline mode (REPO_DOCTOR_OFFLINE=1) by returning None.
+        - Uses a short per-request timeout and runs PyGithub blocking calls in a thread
+          to avoid blocking the event loop.
+        - Handles common GitHub exceptions gracefully and logs at debug level.
         """
-        # In offline mode, still attempt to use patched/mocked get_repo if present.
-        # If the call fails (likely due to real network), return None gracefully.
-        try:
+        if self.offline:
+            self.logger.debug("Offline mode enabled; skipping GitHub fetch for %s/%s:%s", owner, name, filename)
+            return None
+
+        def _fetch_sync():
+            # Synchronous helper executed in a thread
             repo = self.github.get_repo(f"{owner}/{name}")
             file_content = repo.get_contents(filename)
             return file_content.decoded_content.decode("utf-8")
-        except Exception:
-            return None
+
+        loop = asyncio.get_running_loop()
+        try:
+            # Cap total operation time slightly above the underlying HTTP timeout
+            total_timeout = self._github_request_timeout() + 1
+            return await asyncio.wait_for(loop.run_in_executor(None, _fetch_sync), timeout=total_timeout)
+        except RateLimitExceededException as e:
+            self.logger.warning("GitHub rate limit exceeded fetching %s/%s:%s: %s", owner, name, filename, e)
+        except GithubException as e:
+            # 404s and others should not fail the whole analysis
+            status = getattr(e, 'status', None)
+            if status == 404:
+                self.logger.debug("File not found on GitHub %s/%s:%s", owner, name, filename)
+            else:
+                self.logger.warning("GitHub error fetching %s/%s:%s: %s", owner, name, filename, e)
+        except asyncio.TimeoutError:
+            self.logger.warning("Timed out fetching %s/%s:%s from GitHub", owner, name, filename)
+        except Exception as e:
+            # Catch-all to ensure robustness in integration tests
+            self.logger.debug("Failed to fetch %s/%s:%s due to %s", owner, name, filename, e)
+        return None

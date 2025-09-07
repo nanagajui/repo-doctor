@@ -55,12 +55,21 @@ class ResolutionAgent:
         # Initialize contract validation
         self.performance_monitor = AgentPerformanceMonitor()
 
-    def resolve(
+    async def resolve(
+        self, analysis: Analysis, strategy: Optional[str] = None
+    ) -> Resolution:
+        """Generate resolution with contract validation.
+
+        This method is now async to support both sync and async usage patterns.
+        """
+        return await self._resolve_async(analysis, strategy)
+
+    def resolve_sync(
         self, analysis: Analysis, strategy: Optional[str] = None
     ) -> Resolution:
         """Generate resolution (sync) with contract validation.
 
-        This is a fully synchronous implementation used by tests and CLI wrappers.
+        This is a fully synchronous implementation used by CLI wrappers.
         LLM-enhanced steps are skipped in the sync path to avoid event loop usage.
         """
         start_time = time.time()

@@ -519,7 +519,7 @@ class TestAgentIntegration:
             
             agent = ResolutionAgent()
             
-            resolution = agent.resolve(mock_analysis, "docker")
+            resolution = agent.resolve_sync(mock_analysis, "docker")
             
             # Should be valid according to contracts
             AgentContractValidator.validate_resolution(resolution)

@@ -205,7 +205,7 @@ class TestResolutionAgent:
     def test_resolution_creation(self, mock_analysis):
         """Test that ResolutionAgent creates a valid resolution."""
         agent = ResolutionAgent()
-        resolution = agent.resolve(mock_analysis, strategy="docker")
+        resolution = agent.resolve_sync(mock_analysis, strategy="docker")
 
         assert resolution is not None
         assert resolution.strategy is not None
@@ -224,7 +224,7 @@ class TestResolutionAgent:
         """Test Docker file generation."""
         agent = ResolutionAgent()
 
-        resolution = agent.resolve(mock_analysis, strategy="docker")
+        resolution = agent.resolve_sync(mock_analysis, strategy="docker")
         assert resolution is not None
         assert len(resolution.generated_files) > 0
 
@@ -253,7 +253,7 @@ class TestAgentIntegration:
         analysis = await analysis_agent.analyze("https://github.com/test/repo")
 
         # Generate resolution
-        resolution = resolution_agent.resolve(analysis, strategy="docker")
+        resolution = resolution_agent.resolve_sync(analysis, strategy="docker")
 
         assert resolution is not None
         assert len(resolution.generated_files) > 0

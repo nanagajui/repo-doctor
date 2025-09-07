@@ -119,7 +119,7 @@ async def test_complete_agent_workflow(mock_github):
     
     start_time = time.time()
     resolution_agent = ResolutionAgent()
-    resolution = resolution_agent.resolve(analysis, "docker")
+    resolution = resolution_agent.resolve_sync(analysis, "docker")
     resolution_duration = time.time() - start_time
     
     print(f"✅ Resolution generated in {resolution_duration:.2f}s")

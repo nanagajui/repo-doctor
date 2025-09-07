@@ -172,6 +172,19 @@ advanced:
   parallel_agents: true
 ```
 
+## Environment Variables
+
+- REPO_DOCTOR_OFFLINE
+  - When set to a truthy value (e.g., "1", "true"), Repo Doctor will avoid making network calls to GitHub and other external services. Use this during tests to ensure fully offline execution paths.
+- REPO_DOCTOR_GITHUB_TIMEOUT
+  - Per-request timeout in seconds for GitHub API calls (default: 5). The value is clamped to a safe range (2–30) to prevent extreme settings from hanging or prematurely failing tests.
+- LLM_BASE_URL
+  - Base URL for the LLM service, e.g., http://localhost:1234/v1. Tests and the CLI can operate against a local or remote server. The LLM integration includes timeouts and graceful fallbacks.
+
+Notes:
+- Unauthenticated GitHub requests are allowed by default (missing token does not force offline mode). Set REPO_DOCTOR_OFFLINE to enforce strictly offline behavior when needed.
+- Environment variables may be loaded via .env using the existing EnvLoader utility, or provided directly in the environment.
+
 ## LLM Enhancement Roadmap
 
 Repo Doctor includes a comprehensive plan for expanding LLM integration across all aspects of the application:

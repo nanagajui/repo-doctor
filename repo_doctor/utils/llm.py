@@ -1,11 +1,15 @@
 """LLM integration utilities for enhanced analysis."""
-
+import asyncio
+import hashlib
 import json
 import os
+import re
+import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import aiohttp
+import requests
 from .llm_discovery import smart_llm_config
 from .config import Config  # Expose Config at module level for tests that patch it
 
@@ -16,17 +20,20 @@ class LLMClient:
     def __init__(
         self,
         base_url: Optional[str] = None,
+        model: str = "openai/gpt-oss-20b",
         api_key: Optional[str] = None,
-        model: Optional[str] = None,
         timeout: int = 30,
         use_smart_discovery: bool = True,
+        enabled: bool = True,
     ):
-        # Match tests: do not set from env here; only set from env during availability check
-        self.base_url = base_url.rstrip("/") if base_url else None
-        self.api_key = api_key or os.getenv("LLM_API_KEY")
-        self.model = model or self._get_default_model()
+        # Normalize URL by removing trailing slashes
+        self.base_url = base_url.rstrip('/') if base_url else None
+        self.model = model
+        # Read API key from environment if not provided
+        self.api_key = api_key or os.environ.get('LLM_API_KEY')
         self.timeout = timeout
         self.use_smart_discovery = use_smart_discovery
+        self.enabled = enabled
         self.available = False
         self._availability_checked = False
         self._smart_config = None
@@ -41,9 +48,31 @@ class LLMClient:
             return "openai/gpt-oss-20b"
 
     async def _check_availability(self) -> bool:
-        """Check if LLM service is available with smart discovery."""
+        """Check if LLM service is available."""
+        # Early return if LLM is disabled
+        if not self.enabled:
+            self.available = False
+            self._availability_checked = True
+            return False
+            
         if self._availability_checked:
             return self.available
+
+        # Smart discovery first if enabled
+        if self.use_smart_discovery and not self.base_url:
+            try:
+                self._smart_config = smart_llm_config()
+                if self._smart_config:
+                    self.base_url = self._smart_config.base_url
+                    self.model = self._smart_config.model
+                    self.available = True
+                    self._availability_checked = True
+                    return True
+                else:
+                    return False
+            except Exception:
+                # If discovery fails silently, continue to fallback below
+                pass
         
         # Use smart discovery if enabled and no specific URL provided
         if self.use_smart_discovery and not self.base_url:
@@ -74,6 +103,9 @@ class LLMClient:
                     self.available = response.status == 200
                     self._availability_checked = True
                     return self.available
+        except asyncio.CancelledError:
+            # Handle cancellation gracefully - don't mark as unavailable
+            return False
         except Exception:
             self.available = False
             self._availability_checked = True
@@ -83,6 +115,10 @@ class LLMClient:
         self, prompt: str, max_tokens: int = 512, temperature: float = 0.1
     ) -> Optional[str]:
         """Generate completion using local LLM."""
+        # Early return if LLM is disabled
+        if not self.enabled:
+            return None
+            
         if not self.available:
             await self._check_availability()
             if not self.available:
@@ -128,6 +164,9 @@ class LLMClient:
                         return None
                 return await _do_request()
 
+        except asyncio.CancelledError:
+            # Handle cancellation gracefully - don't mark as unavailable
+            return None
         except Exception as e:
             # Mark as unavailable on any exception
             self.available = False
@@ -481,6 +520,7 @@ class LLMFactory:
                 model=config.integrations.llm.model,
                 timeout=config.integrations.llm.timeout,
                 use_smart_discovery=True,
+                enabled=config.integrations.llm.enabled,
             )
         else:
             return LLMClient(
@@ -489,6 +529,7 @@ class LLMFactory:
                 model=config.integrations.llm.model,
                 timeout=config.integrations.llm.timeout,
                 use_smart_discovery=False,
+                enabled=config.integrations.llm.enabled,
             )
 
     @staticmethod
@@ -511,6 +552,7 @@ class LLMFactory:
             model=config.integrations.llm.model,
             timeout=config.integrations.llm.timeout,
             use_smart_discovery=use_smart_discovery,
+            enabled=config.integrations.llm.enabled,
         )
 
     @staticmethod

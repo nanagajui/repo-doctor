@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Set
 
 import aiohttp
+import os
 
 from ..models.analysis import DependencyInfo, DependencyType
 
@@ -334,6 +335,51 @@ class RepositoryParser:
         # - or a wrapper with `.get_repo`
         self._backend = github_backend
 
+    def _offline(self) -> bool:
+        """Return True if offline mode is enabled via REPO_DOCTOR_OFFLINE."""
+        val = os.getenv("REPO_DOCTOR_OFFLINE", "").strip().lower()
+        return val in {"1", "true", "yes", "on"}
+    
+    def _has_github_token(self) -> bool:
+        """Check if we have a GitHub token available."""
+        # Check for token in environment variables
+        token_vars = ["GITHUB_TOKEN", "GITHUB_ACCESS_TOKEN", "GH_TOKEN"]
+        for var in token_vars:
+            if os.getenv(var):
+                return True
+        
+        # Check if the backend has authentication
+        try:
+            client = getattr(self._backend, "github", None)
+            if client and hasattr(client, "_Github__requester"):
+                auth = getattr(client._Github__requester, "_Requester__auth", None)
+                return auth is not None
+        except Exception:
+            pass
+            
+        return False
+
+    def _github_request_timeout(self) -> int:
+        """Return per-request timeout (seconds) for GitHub API calls.
+
+        Reads REPO_DOCTOR_GITHUB_TIMEOUT from the environment, defaulting to 5s.
+        Clamps to 2..30s to avoid extremes during tests.
+        """
+        try:
+            val = int(os.getenv("REPO_DOCTOR_GITHUB_TIMEOUT", "5"))
+        except ValueError:
+            val = 5
+        return max(2, min(val, 30))
+
+    async def _run_blocking_with_timeout(self, fn, *args, **kwargs):
+        """Run a blocking function in a thread with an overall asyncio timeout."""
+        loop = asyncio.get_running_loop()
+        timeout = self._github_request_timeout()
+        return await asyncio.wait_for(
+            loop.run_in_executor(None, lambda: fn(*args, **kwargs)),
+            timeout=timeout,
+        )
+
     def _get_repo(self, owner: str, name: str):
         # Prefer `.github` attribute if present
         client = getattr(self._backend, "github", None)
@@ -380,9 +426,16 @@ class RepositoryParser:
         self, owner: str, name: str, filename: str
     ) -> Optional[str]:
         """Get file content from GitHub repository."""
+        if self._offline():
+            return None
+        
+        # Check if we have a GitHub token - if not, go offline to avoid rate limits
+        if not self._has_github_token():
+            return None
+            
         try:
-            repo = self._get_repo(owner, name)
-            file_content = repo.get_contents(filename)
+            repo = await self._run_blocking_with_timeout(self._get_repo, owner, name)
+            file_content = await self._run_blocking_with_timeout(repo.get_contents, filename)
             return file_content.decoded_content.decode("utf-8")
         except Exception:
             return None
@@ -393,9 +446,16 @@ class RepositoryParser:
         """Get Python file contents from repository."""
         python_files = []
 
+        if self._offline():
+            return python_files
+            
+        # Check if we have a GitHub token - if not, go offline to avoid rate limits
+        if not self._has_github_token():
+            return python_files
+
         try:
-            repo = self._get_repo(owner, name)
-            contents = repo.get_contents("")
+            repo = await self._run_blocking_with_timeout(self._get_repo, owner, name)
+            contents = await self._run_blocking_with_timeout(repo.get_contents, "")
 
             count = 0
             for content_file in contents:
@@ -406,7 +466,9 @@ class RepositoryParser:
                     content_file.name.endswith(".py") and content_file.size < 50000
                 ):  # Limit file size
                     try:
-                        file_content = repo.get_contents(content_file.path)
+                        file_content = await self._run_blocking_with_timeout(
+                            repo.get_contents, content_file.path
+                        )
                         python_files.append(
                             (
                                 content_file.path,
